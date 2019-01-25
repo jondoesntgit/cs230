@@ -1,1 +1,5 @@
 python==3.6.*
+
+# Something that was required in https://github.com/anuragkr90/weak_feature_extractor
+librosa
+torch
