@@ -14,3 +14,8 @@ Then, you should be able to gather all of the data by typing this command in the
     $ make
 
 Currently, this command only downloads the dataset, but as we build out more features, it will automate more tasks.
+
+
+## Organization
+
+Driven Data has a nice [template](https://drivendata.github.io/cookiecutter-data-science/) for data science projects. That template is more or less what we use in this repository
