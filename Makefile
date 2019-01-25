@@ -3,11 +3,11 @@
 include .env
 export $(shell sed 's/=.*//' .env)
 
-all: esc50
+all: features
 
 $(CS230_RAW_DATA)/esc50:
-	mkdir -p $(CS230_RAW_DATA)/esc50
-
-esc50: $(CS230_RAW_DATA)/esc50
+	mkdir -p $(CS230_RAW_DATA)
 	git clone https://github.com/karoldvl/ESC-50 $(CS230_RAW_DATA)/esc50
 
+features: | $(CS230_RAW_DATA)/esc50
+	cd ./src/features && python extract_features.py $(CS230_RAW_DATA)/esc50/audio/2-118459-B-32.wav
