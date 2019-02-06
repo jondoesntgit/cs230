@@ -1,19 +1,24 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: osx-64
+absl-py=0.7.0=py36_1000
+astor=0.7.1=py_0
 audioread=2.1.6=py36_0
 blas=1.0=mkl
 bzip2=1.0.6=h1de35cc_1002
-ca-certificates=2018.12.5=0
+c-ares=1.15.0=h1de35cc_1001
+ca-certificates=2018.11.29=ha4d7672_0
 certifi=2018.11.29=py36_1000
 cffi=1.11.5=py36h6174b99_1
 cycler=0.10.0=py_1
 decorator=4.3.2=py_0
 ffmpeg=4.1=heb45b42_1000
 freetype=2.9.1=h597ad8a_1005
+gast=0.2.1.post0=py_0
 gettext=0.19.8.1=hcca000d_1001
 gmp=6.1.2=h0a44026_1000
 gnutls=3.6.5=h53004b3_1001
+grpcio=1.16.1=py36h044775b_1
 intel-openmp=2019.1=144
 joblib=0.13.1=py_0
 jpeg=9b=he5867d9_2
@@ -25,9 +30,11 @@ libffi=3.2.1=h475c297_4
 libgfortran=3.0.1=h93005f0_2
 libiconv=1.15=h1de35cc_1004
 libpng=1.6.36=ha441bb4_1000
+libprotobuf=3.6.1=hd9629dc_1000
 librosa=0.6.2=py_0
 libtiff=4.0.10=hcb84e12_2
 llvmlite=0.26.0=py36h3fea490_1000
+markdown=2.6.11=py_0
 matplotlib=3.0.2=py36_1002
 matplotlib-base=3.0.2=py36hf043ca5_1002
 mkl=2019.1=144
@@ -44,6 +51,7 @@ openh264=1.8.0=hd9629dc_1000
 openssl=1.1.1a=h1de35cc_1000
 pillow=5.4.1=py36hb68e598_0
 pip=19.0.1=py36_0
+protobuf=3.6.1=py36h0a44026_1001
 pycparser=2.19=py36_0
 pyparsing=2.3.1=py_0
 python=3.6.8=haf84260_0
@@ -56,9 +64,13 @@ scipy=1.2.0=py36h1410ff5_0
 setuptools=40.7.3=py36_0
 six=1.12.0=py36_1000
 sqlite=3.26.0=ha441bb4_0
+tensorboard=1.10.0=py36_0
+tensorflow=1.10.0=py36_0
+termcolor=1.1.0=py_2
 tk=8.6.8=ha441bb4_0
 torchvision=0.2.1=py_2
 tornado=5.1.1=py36h1de35cc_1000
+werkzeug=0.14.1=py_0
 wheel=0.32.3=py36_0
 x264=1!152.20180717=h1de35cc_1001
 xz=5.2.4=h1de35cc_4
