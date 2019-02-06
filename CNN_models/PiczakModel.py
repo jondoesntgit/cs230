@@ -14,16 +14,17 @@ from tensorflow import keras
 
 # Helper libraries
 import numpy as np
-import matplotlib.pyplot as plt
 print(tf.__version__)
 
 
 #%%
-def runPiczakModel(X_train, Y_train, X_test, Y_test, lr=0.001, N_epochs=5, N_filters=80, N_dense=500, keep_prob=0.5, minibatch_size=32)
+def runPiczakModel(X_train, Y_train, X_test, Y_test, lr=0.001, N_epochs=5, 
+                   N_filters=80, N_dense=500, keep_prob=0.5, minibatch_size=32):
 # inputs: 
 #         X_train: a numpy array of shape (batch_size, input_h, input_w, 1)
 #         Y_train: a numpy array of shape (batch_size,1).  This should use sparse
-#            encoding, eg. numbers from 0 to 9 (for 10 classes), NOT one-hot coding
+#            encoding, ie. numbers from 0 to N_classes-1 (eg. 0 to 9 for 10 classes)
+#            NOT one-hot coding
 #         X_test: a numpy array of shape (batch_size, input_h, input_w, 1)
 #         Y_test: a numpy array of shape (batch_size,1)
 #         lr: learning rate
@@ -52,10 +53,13 @@ def runPiczakModel(X_train, Y_train, X_test, Y_test, lr=0.001, N_epochs=5, N_fil
     # build Piczak model 
     model = tf.keras.Sequential()
     
-    model.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(input_h - 3,6), padding='valid', strides = 1, activation='relu', input_shape=(input_h,input_w,1))) 
+    model.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(input_h - 3,6), 
+                                     padding='valid', strides = 1, activation='relu', 
+                                     input_shape=(input_h,input_w,1))) 
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(4,3), strides=(4,3)))
     model.add(tf.keras.layers.Dropout(1 - keep_prob))
-    model.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(1,3), padding='valid', activation='relu'))
+    model.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(1,3),
+                                     padding='valid', activation='relu'))
     model.add(tf.keras.layers.MaxPooling2D(pool_size=(1,3), strides=(1,3)))
     model.add(tf.keras.layers.Flatten())
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
