@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Prevent .DS_Store from being committed again
+*.DS_Store
+
+# A lot of us use vim
+*.swp
