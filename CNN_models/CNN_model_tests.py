@@ -15,7 +15,6 @@ from tensorflow import keras
 # Helper libraries
 import numpy as np
 import matplotlib.pyplot as plt
-
 print(tf.__version__)
 
 
@@ -40,7 +39,7 @@ test_images = test_images.reshape(test_images.shape[0],test_images.shape[1],test
 
 
 #%% Do some helpful plots to visualize dataset.
-
+#
 #plt.figure(figsize=(10,10))
 #for i in range(25):
 #    plt.subplot(5,5,i+1)
@@ -69,29 +68,57 @@ model1 = keras.Sequential([
 ])
 
 
+model1.summary()
 
 # For audio, would like to use model similar to the one in this paper: 
 # http://karol.piczak.com/papers/Piczak2015-ESC-ConvNet.pdf
 
+# actual input shape would be roughly 128 x 430, but try this for now
+# note: for specifying kernel size, tuple is (height,width)
+input_h = 28
+input_w = 28
+
+N_filters = 80
+N_dense = 1000
+
+N_classes = 10
+model2 = tf.keras.Sequential()
+
+model2.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(input_h - 3,6), padding='valid', strides = 1, activation='relu', input_shape=(input_h,input_w,1))) 
+model2.add(tf.keras.layers.MaxPooling2D(pool_size=(4,3), strides=(4,3)))
+model2.add(tf.keras.layers.Dropout(0.5))
+model2.add(tf.keras.layers.Conv2D(filters=N_filters, kernel_size=(1,3), padding='valid', activation='relu'))
+model2.add(tf.keras.layers.MaxPooling2D(pool_size=(1,3), strides=(1,3)))
+model2.add(tf.keras.layers.Flatten())
+model2.add(tf.keras.layers.Dense(N_dense, activation='relu'))
+model2.add(tf.keras.layers.Dropout(0.5))
+model2.add(tf.keras.layers.Dense(N_dense, activation='relu'))
+model2.add(tf.keras.layers.Dropout(0.5))
+model2.add(tf.keras.layers.Dense(N_classes, activation='softmax'))
+
+# Take a look at the model summary
+model2.summary()
 
 
 
 
 #%%
-model1.compile(optimizer='adam', 
+model2.compile(optimizer='adam', 
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])    
     
     
 #%%
 # takes ~13 mins to train, achieves 94.8% train accuracy and 91.4% test accuracy.
-model1.fit(train_images, train_labels, epochs=5)
+model2.fit(train_images, train_labels, epochs=5)
 
 #%%
 
-test_loss, test_acc = model1.evaluate(test_images, test_labels)
+test_loss, test_acc = model2.evaluate(test_images, test_labels)
 
 print('Test accuracy:', test_acc)
+
+
 
 
 
