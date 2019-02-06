@@ -8,13 +8,25 @@ Somewhere on your local machine (perhaps even inside of Dropbox), run the follow
 
 Next, create an environment so we can all work using the same version of python.
 
-conda create --name cs230 python=3.6 --file requirements.txt
+    # Add these channels so conda knows where to look for packages
+    conda config --append channels conda-forge 
+    conda config --append channels pytorch
+    
+    # Create the environment
+    conda create --name cs230 python=3.6 --yes --file requirements.txt
+    
+    # Apply the changes
+    source activate cs230
 
-And activate it with
+If your environment has changed (perhaps due to the requirements.txt file being updated), you can upgrade your environment through
 
-source activate cs230
+    conda install --yes --file requirements.txt
 
-If for some reason, conda doesn't install the requirements, you can install the dependencies using pip, using sudo as required.
+To dump your environment into the `requirements.txt`, you can run
+
+    conda list -e > requirements.txt
+
+If for some reason, conda doesn't install the requirements, you can install the dependencies using pip, using sudo as required. Ensure that you're using python==3.6.* however.
 
     pip install -r requirements.txt
 
@@ -27,7 +39,6 @@ Then, you should be able to gather all of the data and run a feature extractor o
 
 Currently, this command only downloads the dataset and runs a feature extractor from an existing Github repository.
 As we build this repo more, make will automate more tasks.
-
 
 ## Organization
 
