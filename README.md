@@ -6,7 +6,15 @@ Somewhere on your local machine (perhaps even inside of Dropbox), run the follow
 
     git clone https://github.com/jondoesntgit/cs230
 
-Install the dependencies using pip
+Next, create an environment so we can all work using the same version of python.
+
+conda create --name cs230 python=3.6 --file requirements.txt
+
+And activate it with
+
+source activate cs230
+
+If for some reason, conda doesn't install the requirements, you can install the dependencies using pip, using sudo as required.
 
     pip install -r requirements.txt
 
