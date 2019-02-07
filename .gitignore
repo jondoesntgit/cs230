@@ -111,3 +111,6 @@ venv.bak/
 
 # A lot of us use vim
 *.swp
+
+# Don't commit binary h5 files
+*.h5

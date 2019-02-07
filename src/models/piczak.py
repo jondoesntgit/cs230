@@ -11,6 +11,8 @@ from tensorflow import keras
 
 import numpy as np
 import logging
+import sys
+import getopt
 
 from pathlib import Path
 from dotenv import load_dotenv
@@ -82,6 +84,14 @@ def main():
     Run a test of functionality by loading the esc50 dataset and run the
     standard Piczak model.
     """
+
+    options, remainder = getopt.gnu_getopt(sys.argv[1:], 'e', ['epochs='])
+    epochs = 5
+    for opt, arg in options:
+        if opt in ('-e', '--epochs'):
+            if arg != "":
+                epochs = int(arg)
+
     ESC50_SPLITS_PATH = Path(os.getenv('ESC50_SPLITS')).expanduser()
 
     X_train = np.load(ESC50_SPLITS_PATH / 'train/train_data.npy')
@@ -103,7 +113,10 @@ def main():
     logging.debug(f'X_test shape: {X_test.shape}')
     logging.debug(f'y_test shape: {y_test.shape}')
 
-    accuracy, model = run_piczak_model(X_train, y_train, X_test, y_test)
+    accuracy, model = run_piczak_model(X_train, y_train, X_test, y_test,
+                                       N_epochs=epochs)
+
+    model.save('piczak.h5')
 
 
 if __name__ == '__main__':
