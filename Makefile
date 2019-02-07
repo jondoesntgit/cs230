@@ -14,6 +14,7 @@ audioset:
 	curl storage.googleapis.com/us_audioset/youtube_corpus/v1/features/features.tar.gz -o /tmp/features.tar.gz
 	mkdir -p $(AUDIOSET_TENSORFLOW_VGG_FEATURES)
 	tar -xvzf /tmp/features.tar.gz -C $(AUDIOSET_TENSORFLOW_VGG_FEATURES)
+	cd $(AUDIOSET_TENSORFLOW_VGG_FEATURES) && curl -O http://storage.googleapis.com/us_audioset/youtube_corpus/v1/csv/class_labels_indices.csv
 
 features: | $(CS230_RAW_DATA)/esc50
 	cd ./src/features && python extract_features.py $(CS230_RAW_DATA)/esc50/audio/2-118459-B-32.wav
