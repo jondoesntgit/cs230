@@ -2,36 +2,63 @@
 # Behrad Habib Afshar
 # 5-Feb-2019
 
+"""
+Usage
+
+python esc50.py --log=DEBUG
+
+Extracts features from each of the datasets and puts them into a folder defined by ESC50_SPLITS in the .env file
+
+From here, the files can be loaded using
+
+.. code:: python
+
+	import numpy as np
+	train_data = np.load('train_data.npy')
+	train_labels = np.load('train_labels.npy')
+   
+"""
+
 import numpy as np
 import librosa as lib
 import os
 import pickle
+from pathlib import Path
+from dotenv import load_dotenv
+import logging
+import getopt
+import sys
+import tqdm
 
-# Audio clips stored in  local storage
-esc50_folder = '/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio'
-# Make the Train, Dev and Test directories
-try:
-	os.mkdir("/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio/Train")
-except FileExistsError:
-	print('Directory exists!')
+loglevel = 'WARNING'
+options, remainder = getopt.gnu_getopt(sys.argv[1:], 'l', ['log='])
+for opt, arg in options:
+	if opt in ('-l', '--log'):
+		loglevel = arg
 
-try:
-	os.mkdir("/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio/Dev")
-except FileExistsError:
-	print('Directory exists!')
+numeric_level = getattr(logging, loglevel.upper(), None)
+if not isinstance(numeric_level, int):
+	raise ValueError('Invalid log level: %s' % loglevel)
+logging.basicConfig(level=numeric_level)
 
-try:
-	os.mkdir("/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio/Test")
-except FileExistsError:
-	print('Directory exists!')
+load_dotenv()
+ESC50_RAW_DATA = Path(os.getenv('ESC50_REPO')).expanduser() / 'audio'
+ESC50_SPLITS_PATH = Path(os.getenv('ESC50_SPLITS')).expanduser()
 
+logging.debug('Creating directories.')
+train_path = ESC50_SPLITS_PATH / 'train'
+dev_path = ESC50_SPLITS_PATH / 'dev'
+test_path = ESC50_SPLITS_PATH / 'test'
+
+for p in (train_path, dev_path, test_path):
+	p.mkdir(parents=True, exist_ok=True)
+	assert p.exists()
 
 # Spectrogram settings
 n_fft = 1024
 hop_length = 512
 n_mels = 128
 srate = 44100
-
 
 # Number of data in train/dev/test sets
 count_train = 0
@@ -47,44 +74,42 @@ test_data = np.empty((n_mels, 431))
 test_label = []
 
 # Go through all files in the folder
-for file_name in os.listdir(esc50_folder):
+for file_name in tqdm.tqdm(os.listdir(ESC50_RAW_DATA)):
 
 	try:
-		y, sr = lib.load(esc50_folder+'/'+file_name,sr=None)
+		y, sr = lib.load(ESC50_RAW_DATA / file_name, sr=None)
+		#logging.info('Processing %s' % file_name)
 
 		if len(y.shape) > 1:
-			print('Mono Conversion') 
+		#	logging.info('Mono Conversion') 
 			y = lib.to_mono(y)
 
 		if sr != srate:
-			print('Resampling to '+str(srate))
+		#	logging.info('Resampling to '+str(srate))
 			y = lib.resample(y,sr,srate)
 
 		mel_feat = lib.feature.melspectrogram(y=y,sr=srate,n_fft=n_fft,hop_length=hop_length,n_mels=128)
 	
 		#Filename decomposed: {Fold} - {ID} - {Take} - {Class}
-		f_name = file_name.split('-')
+		fold, fid, ftake, fclass = file_name.split('-') 
+		fold = int(fold)
+		fclass = int(fclass.split('.')[0])
 
 		# Divide the data into three
-		if int(f_name[0]) < 4:
+		if fold < 4:
 			train_data = np.dstack((train_data, mel_feat))
-			train_label.append(int(f_name[3].split('.')[0]))
+			train_label.append(fclass)
 			count_train += 1
-		elif int(f_name[0]) == 4:
+		elif fold == 4:
 			dev_data = np.dstack((dev_data, mel_feat))
-			dev_label.append(int(f_name[3].split('.')[0]))
+			dev_label.append(fclass)
 			count_dev += 1
 		else:
 			test_data = np.dstack((test_data, mel_feat))
-			test_label.append(int(f_name[3].split('.')[0]))
+			test_label.append(fclass)
 			count_test += 1
-	except:
-		#raise IOError('Give me an audio  file which I can read!!')
-		print(file_name+" did not get coverted!")
-    
-	
-
-	
+	except IOError: # Give me an audio file which I can read!!
+		logging.error(file_name, "did not get coverted!")
 
 # Remove the first element randomly initialized by np.empty
 train_data = np.delete(train_data, 0, 2)
@@ -92,28 +117,18 @@ dev_data = np.delete(dev_data, 0, 2)
 test_data = np.delete(test_data, 0, 2)
 
 # Pickle data into appropriate folders
-with open('/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio/Processed_Data/train_data_label', 'wb') as f:
-	pickle.dump(train_data, f)
-	pickle.dump(train_label,f)
-f.close()
+np.save(train_path/'train_data', train_data)
+np.save(train_path/'train_label', train_label)
+np.save(dev_path/'dev_data', dev_data)
+np.save(dev_path/'dev_label', dev_label)
+np.save(test_path/'test_data', test_data)
+np.save(test_path/'test_label', test_label)
 
-with open('/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/audio/Processed_Data/dev_data_label', 'wb') as f:
-	pickle.dump(dev_data, f)
-	pickle.dump(dev_label,f)
-f.close()
-
-with open('/Users/behrad/Documents/Stanford/cs230/raw_data/ESC-50-master/Processed_Data/test_data_label', 'wb') as f:
-	pickle.dump(test_data, f)
-	pickle.dump(test_label,f)
-f.close()
-
-print('train_data shape'+str(train_data.shape)+'   and train label shape' + str(len(train_label)))
-print('dev_data shape'+str(dev_data.shape)+'   and dev label shape' + str(len(dev_label)))
-print('test_data shape'+str(test_data.shape)+'   and test label shape' + str(len(test_label)))
+logging.info('train_data shape'+str(train_data.shape)+'   and train label shape' + str(len(train_label)))
+logging.info('dev_data shape'+str(dev_data.shape)+'   and dev label shape' + str(len(dev_label)))
+logging.info('test_data shape'+str(test_data.shape)+'   and test label shape' + str(len(test_label)))
 
 # Output some stats
-print('# of training data: '+str(count_train) + ' which is: ' + str(count_train/(count_train+count_test+count_dev))+' of all the data')
-print('# of dev data: '+str(count_dev) + ' which is: ' + str(count_dev/(count_train+count_test+count_dev))+' of all the data')
-print('# of test data: '+str(count_test) + ' which is: ' + str(count_test/(count_train+count_test+count_dev))+' of all the data')
-
-
+logging.info('# of training data: '+str(count_train) + ' which is: ' + str(count_train/(count_train+count_test+count_dev))+' of all the data')
+logging.info('# of dev data: '+str(count_dev) + ' which is: ' + str(count_dev/(count_train+count_test+count_dev))+' of all the data')
+logging.info('# of test data: '+str(count_test) + ' which is: ' + str(count_test/(count_train+count_test+count_dev))+' of all the data')
