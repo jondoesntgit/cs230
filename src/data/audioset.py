@@ -30,7 +30,9 @@ CLASS_LABELS_INDICES_PATH = AUDIOSET_PATH / 'class_labels_indices.csv'
 
 class_labels_indices = pd.read_csv(CLASS_LABELS_INDICES_PATH)
 
-with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
+
+def index(sqlite_conn, h5file):
+    conn = sqlite_conn
     cursor = conn.cursor()
 
     # Drop the old tables (we assume we're remaking it...)
@@ -39,7 +41,7 @@ with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
     cursor.execute('DROP TABLE IF EXISTS labels;')
 
     # Create the tables
-    with Path('./create_audioset_tables.sql').open('r') as f:
+    with (Path(__file__).parent /'create_audioset_tables.sql').open('r') as f:
         sql = f.read()
     cursor.executescript(sql)
 
@@ -50,8 +52,6 @@ with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
     sql = 'INSERT INTO labels VALUES(?, ?, ?)'
     cursor.executemany(sql, labels)
     conn.commit()
-
-    h5file = h5py.File(str(AUDIOSET_H5_DATABASE), 'w')
 
     # Populate the tables from the tfrecords
     tfrecord_filenames = (str(f) for f in BAL_TRAIN_PATH.glob('1*.tfrecord'))
@@ -108,7 +108,40 @@ with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
                             start_time_seconds, end_time_seconds)
                            for label_id in label_ids)
             cursor.executemany(sql, params)
-    h5file.close()
     conn.commit()
 
-    # Put all the tf records into a hdf5 file
+class AudiosetManager():
+
+    def __init__(self):
+        self.h5file = h5py.File(str(AUDIOSET_H5_DATABASE), 'r')
+        with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
+            sql = 'SELECT * FROM labels;'
+            self._classes = pd.read_sql_query(sql, conn)
+
+            sql = 'SELECT * FROM videos;'
+            self._videos = pd.read_sql_query(sql, conn)
+
+            sql = 'SELECT * from labels_videos;'
+            self._labels_videos = pd.read_sql_query(sql, conn)
+
+    @property
+    def classes(self):
+        return self._classes
+
+    @property
+    def videos(self):
+        return self._videos
+
+    @property
+    def labels_videos(self):
+        return self._labels_videos
+
+    def get_vggish(self, key):
+        return self.h5file[key][()]
+
+
+if __name__ == '__main__':
+    with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
+        with h5py.File(str(AUDIOSET_H5_DATABASE), 'w') as h5file:
+            index(conn, h5file)
+
