@@ -19,12 +19,13 @@ from data.audioset import AudiosetManager
 if __name__ == '__main__':
     am = AudiosetManager()
 
+    # Build a one-hot matrix (with multiple "one-hots")
+    df = am.get_data_with_single_label()
+
     # Filter out short clips (6 seconds, etc...)
-    keys = [key for key in am.videos.video_id.values
+    keys = [key for key in df.video_id.values
             if am.get_vggish(key).shape[0] == 10]
 
-    # Build a one-hot matrix (with multiple "one-hots")
-    df = am.labels_videos
     num_labels = max(df.label_id.values) + 1
     y_train = np.zeros((len(keys), num_labels))
     for i, key in enumerate(keys):

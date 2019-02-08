@@ -155,8 +155,19 @@ class AudiosetManager():
     def get_vggish(self, key):
         return self.h5file[key][()]
 
+    def get_data_with_single_label(self, labels=None):
+        with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
+            sql = (
+                'SELECT * FROM labels_videos '
+                'GROUP BY video_id '
+                'HAVING COUNT(*)=1 '
+                )
+            df = pd.read_sql_query(sql, conn)
+            if labels is not None:
+                return df[df.label_id.isin(labels)]
+            return df
 
 if __name__ == '__main__':
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
-        with h5py.File(str(AUDIOSET_H5_DATABASE), 'w') as h5file:
+        with h5py.File(str(AUDIOSET_H5_DATABASE), 'a') as h5file:
             index(conn, h5file)
