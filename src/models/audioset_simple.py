@@ -34,10 +34,10 @@ if __name__ == '__main__':
 
     X_train = np.stack([am.get_vggish(key) for key in keys], axis=0)
     X_train = np.expand_dims(X_train, axis=-1)
+    print(X_train.shape)
 
     input_h = X_train.shape[1]
     input_w = X_train.shape[2]
-    N_classes = np.max(y_train) + 1
 
     keras.backend.clear_session()
     model = tf.keras.Sequential()
@@ -51,11 +51,10 @@ if __name__ == '__main__':
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
-    model.add(tf.keras.layers.Dense(N_classes, activation='softmax'))
+    model.add(tf.keras.layers.Dense(num_labels, activation='softmax'))
 
-    adamOptimizer = tf.keras.optimizers.Adam(lr=lr)
-    model.compile(optimizer=adamOptimizer,
-                  loss='sparse_categorical_crossentropy',
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr),
+                  loss='categorical_crossentropy',
                   metrics=['accuracy'])
 
     model.fit(X_train, y_train, epochs=N_epochs, batch_size=minibatch_size)
