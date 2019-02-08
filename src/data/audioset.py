@@ -41,7 +41,7 @@ def index(sqlite_conn, h5file):
     cursor.execute('DROP TABLE IF EXISTS labels;')
 
     # Create the tables
-    with (Path(__file__).parent /'create_audioset_tables.sql').open('r') as f:
+    with (Path(__file__).parent / 'create_audioset_tables.sql').open('r') as f:
         sql = f.read()
     cursor.executescript(sql)
 
@@ -54,7 +54,7 @@ def index(sqlite_conn, h5file):
     conn.commit()
 
     # Populate the tables from the tfrecords
-    tfrecord_filenames = (str(f) for f in BAL_TRAIN_PATH.glob('1*.tfrecord'))
+    tfrecord_filenames = (str(f) for f in BAL_TRAIN_PATH.glob('*.tfrecord'))
 
     split_index = 0
     for tfrecord in tqdm.tqdm(list(tfrecord_filenames)):
@@ -144,4 +144,3 @@ if __name__ == '__main__':
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
         with h5py.File(str(AUDIOSET_H5_DATABASE), 'w') as h5file:
             index(conn, h5file)
-
