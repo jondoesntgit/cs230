@@ -32,13 +32,91 @@ CLASS_LABELS_INDICES_PATH = AUDIOSET_PATH / 'class_labels_indices.csv'
 
 class_labels_indices = pd.read_csv(CLASS_LABELS_INDICES_PATH)
 
+def index_tfrecord(conn, h5file, tfrecord, split_index):
+    cursor = conn.cursor()
+    ebar = tqdm.tqdm(list(tf.python_io.tf_record_iterator(tfrecord)))
+    for example in ebar:
+        tf_example = tf.train.Example.FromString(example)
 
-def index(sqlite_conn, h5file, force=False):
-    conn = sqlite_conn
+        f = tf_example.features.feature
+        video_id = (f['video_id'].bytes_list.value[0]
+                    ).decode(encoding='UTF-8')
+        ebar.set_description('youtube.com/%s' % video_id)
+
+        # TODO: This is not failproof. This may skip videos that have
+        # multiple labels
+        sql = 'SELECT COUNT(*) FROM labels_videos WHERE video_id = ?'
+        cursor.execute(sql, (video_id,))
+        num_rows = cursor.fetchone()[0]
+        if num_rows:
+            continue
+
+        if len(f['start_time_seconds'].float_list.value) > 1:
+            print(video_id)
+        start_time_seconds = (f['start_time_seconds']
+                              ).float_list.value[0]
+        end_time_seconds = (f['end_time_seconds']
+                            ).float_list.value[0]
+
+        label_ids = list(np.asarray(
+            tf_example.features.feature['labels'].int64_list.value))
+
+        tf_seq_example = tf.train.SequenceExample.FromString(example)
+        fl = (tf_seq_example.feature_lists
+              ).feature_list['audio_embedding']
+        n_frames = len(fl.feature)
+
+        if video_id not in h5file.keys():
+            audio_frames = [tf.cast(tf.decode_raw(
+                fl.feature[i].bytes_list.value[0], tf.uint8), tf.uint8
+                ).eval()
+                for i in range(n_frames)]
+
+            arr = np.array(audio_frames)
+            h5file.create_dataset(
+                name=video_id,
+                data=arr)
+            h5file.flush()
+        else:
+            logging.info('%s has already been indexed' % video_id)
+
+        sql = (
+            'INSERT INTO videos'
+            '(video_id)'
+            'VALUES (?)'
+            )
+        cursor.execute(sql, (
+            video_id,))
+        conn.commit()
+
+        sql = (
+            'INSERT INTO labels_videos'
+            '(video_id, label_id, split_id, start_time_seconds,'
+            ' end_time_seconds)'
+            'VALUES (?, ?, ?, ?, ?)'
+            )
+
+        params = tuple((video_id, int(label_id), split_index,
+                        start_time_seconds, end_time_seconds)
+                       for label_id in label_ids)
+        cursor.executemany(sql, params)
+
+def index_folder(conn, h5file, folder, split_index):
+    cursor = conn.cursor()
+    tfrecord_filenames = folder.glob('*.tfrecord')
+    tbar = tqdm.tqdm(list(tfrecord_filenames))
+    for tfrecord in tbar:
+        tbar.set_description('Indexing %s' % tfrecord.name)
+        index_tfrecord(conn, h5file, str(tfrecord), split_index)
+    conn.commit()
+
+
+def make_tables(conn, h5file, force=False):
     cursor = conn.cursor()
 
     # Drop the old tables (we assume we're remaking it...)
     if force:
+        logging.info('Dropping tables')
         cursor.execute('DROP TABLE IF EXISTS labels_videos;')
         cursor.execute('DROP TABLE IF EXISTS videos;')
         cursor.execute('DROP TABLE IF EXISTS labels;')
@@ -57,84 +135,16 @@ def index(sqlite_conn, h5file, force=False):
         cursor.executemany(sql, labels)
         conn.commit()
 
-    # Populate the tables from the tfrecords
 
-
-    split_index = 0
-
+def index_all(conn, h5file):
+    cursor = conn.cursor()
     sess = tf.Session()
     with sess.as_default():
-      for folder in [BAL_TRAIN_PATH, EVAL_PATH, UNBAL_TRAIN_PATH]:
-        logging.info('Indexing %s' % folder.name)
-        tfrecord_filenames = (str(f) for f in folder.glob('*.tfrecord'))
-        tbar = tqdm.tqdm(list(tfrecord_filenames))
-        for tfrecord in tbar:
-            for example in tf.python_io.tf_record_iterator(tfrecord):
-                tf_example = tf.train.Example.FromString(example)
-
-                f = tf_example.features.feature
-                video_id = (f['video_id'].bytes_list.value[0]
-                            ).decode(encoding='UTF-8')
-                tbar.set_description('Indexing %s' % video_id)
-
-                # TODO: This is not failproof. This may skip videos that have
-                # multiple labels
-                sql = 'SELECT COUNT(*) FROM labels_videos WHERE video_id = ?'
-                cursor.execute(sql, (video_id,))
-                num_rows = cursor.fetchone()[0]
-                if num_rows:
-                    continue
-
-                if len(f['start_time_seconds'].float_list.value) > 1:
-                    print(video_id)
-                start_time_seconds = (f['start_time_seconds']
-                                      ).float_list.value[0]
-                end_time_seconds = (f['end_time_seconds']
-                                    ).float_list.value[0]
-
-                label_ids = list(np.asarray(
-                    tf_example.features.feature['labels'].int64_list.value))
-
-                tf_seq_example = tf.train.SequenceExample.FromString(example)
-                fl = (tf_seq_example.feature_lists
-                      ).feature_list['audio_embedding']
-                n_frames = len(fl.feature)
-
-                audio_frames = [tf.cast(tf.decode_raw(
-                    fl.feature[i].bytes_list.value[0], tf.uint8), tf.uint8
-                    ).eval()
-                    for i in range(n_frames)]
-
-                arr = np.array(audio_frames)
-                try:
-                    h5file.create_dataset(
-                        name=video_id,
-                        data=arr)
-                    h5file.flush()
-                except RuntimeError:
-                    print('Array for %s already exists' % video_id)
-
-                sql = (
-                    'INSERT INTO videos'
-                    '(video_id)'
-                    'VALUES (?)'
-                    )
-                cursor.execute(sql, (
-                    video_id,))
-                conn.commit()
-
-                sql = (
-                    'INSERT INTO labels_videos'
-                    '(video_id, label_id, split_id, start_time_seconds,'
-                    ' end_time_seconds)'
-                    'VALUES (?, ?, ?, ?, ?)'
-                    )
-
-                params = tuple((video_id, int(label_id), split_index,
-                                start_time_seconds, end_time_seconds)
-                               for label_id in label_ids)
-                cursor.executemany(sql, params)
-        conn.commit()
+        for split_index, folder in enumerate(
+                [BAL_TRAIN_PATH, UNBAL_TRAIN_PATH, EVAL_PATH]):
+            logging.info('Indexing %s' % folder.name)
+            index_folder(conn, h5file, folder, split_index)
+            conn.commit()
     sess.close()
 
 
@@ -183,5 +193,6 @@ class AudiosetManager():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
-        with h5py.File(str(AUDIOSET_H5_DATABASE), 'a') as h5file:
-            index(conn, h5file)
+        with h5py.File(str(AUDIOSET_H5_DATABASE), 'w') as h5file:
+            make_tables(conn, h5file, force=True)
+            index_all(conn, h5file)
