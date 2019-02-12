@@ -55,25 +55,28 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
 
         if len(f['start_time_seconds'].float_list.value) > 1:
             print(video_id)
-        start_time_seconds = (f['start_time_seconds']
-                              ).float_list.value[0]
-        end_time_seconds = (f['end_time_seconds']
-                            ).float_list.value[0]
+        start_time_seconds = f['start_time_seconds'].float_list.value[0]
+        end_time_seconds = f['end_time_seconds'].float_list.value[0]
 
         label_ids = list(np.asarray(
             tf_example.features.feature['labels'].int64_list.value))
 
         tf_seq_example = tf.train.SequenceExample.FromString(example)
-        fl = (tf_seq_example.feature_lists
-              ).feature_list['audio_embedding']
+        fl = tf_seq_example.feature_lists.feature_list['audio_embedding']
         n_frames = len(fl.feature)
 
-        audio_frames = []
+        length = 2 * 128
 
-        for frame_index in range(n_frames):
-            hex_embed = fl.feature[frame_index].bytes_list.value[0].hex()
-            vals = [int(hex_embed[i:i+2], 16) for i in range(0, len(hex_embed), 2)]
-            audio_frames.append(vals)
+        #for frame_index in range(n_frames):
+        #    hex_embed = fl.feature[frame_index].bytes_list.value[0].hex()
+        #    vals = [int(hex_embed[i:i+2], 16) for i in range(0, length, 2)]
+        #    audio_frames.append(vals)
+
+        audio_frames = [
+            [int(fl.feature[frame_index].bytes_list.value[0].hex()[i:i+2], 16) 
+            for i in range(0, length, 2)]
+            for frame_index in range(n_frames)
+        ]
 
         if video_id not in h5file.keys():
             arr = np.array(audio_frames)
