@@ -15,6 +15,7 @@ import tqdm
 import h5py
 import logging
 
+import profile
 load_dotenv()
 
 AUDIOSET_PATH = os.getenv('AUDIOSET_PATH')
@@ -24,13 +25,14 @@ AUDIOSET_SQLITE_DATABASE = Path(AUDIOSET_SQLITE_DATABASE).expanduser()
 AUDIOSET_H5_DATABASE = os.getenv('AUDIOSET_H5_DATABASE')
 AUDIOSET_H5_DATABASE = Path(AUDIOSET_H5_DATABASE).expanduser()
 
-EMBEDDINGS_PATH = AUDIOSET_PATH / 'vgg_features/audioset_v1_embeddings'
+EMBEDDINGS_PATH = AUDIOSET_PATH / 'audioset_v1_embeddings'
 BAL_TRAIN_PATH = EMBEDDINGS_PATH / 'bal_train'
 UNBAL_TRAIN_PATH = EMBEDDINGS_PATH / 'unbal_train'
 EVAL_PATH = EMBEDDINGS_PATH / 'eval'
 CLASS_LABELS_INDICES_PATH = AUDIOSET_PATH / 'class_labels_indices.csv'
 
 class_labels_indices = pd.read_csv(CLASS_LABELS_INDICES_PATH)
+
 
 def index_tfrecord(conn, h5file, tfrecord, split_index):
     cursor = conn.cursor()
@@ -66,12 +68,14 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
               ).feature_list['audio_embedding']
         n_frames = len(fl.feature)
 
-        if video_id not in h5file.keys():
-            audio_frames = [tf.cast(tf.decode_raw(
-                fl.feature[i].bytes_list.value[0], tf.uint8), tf.uint8
-                ).eval()
-                for i in range(n_frames)]
+        audio_frames = []
 
+        for frame_index in range(n_frames):
+            hex_embed = fl.feature[frame_index].bytes_list.value[0].hex()
+            vals = [int(hex_embed[i:i+2], 16) for i in range(0, len(hex_embed), 2)]
+            audio_frames.append(vals)
+
+        if video_id not in h5file.keys():
             arr = np.array(audio_frames)
             h5file.create_dataset(
                 name=video_id,
@@ -103,12 +107,19 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
 
 def index_folder(conn, h5file, folder, split_index):
     cursor = conn.cursor()
-    tfrecord_filenames = folder.glob('*.tfrecord')
-    tbar = tqdm.tqdm(list(tfrecord_filenames))
+    tfrecord_filenames = list(folder.glob('*.tfrecord'))
+    tbar = tqdm.tqdm(tfrecord_filenames)
     for tfrecord in tbar:
         tbar.set_description('Indexing %s' % tfrecord.name)
         index_tfrecord(conn, h5file, str(tfrecord), split_index)
     conn.commit()
+
+def index_all(conn, h5file):
+    for split_index, folder in enumerate(
+            [BAL_TRAIN_PATH, EVAL_PATH, UNBAL_TRAIN_PATH]):
+        logging.info('Indexing %s' % folder.name)
+        index_folder(conn, h5file, folder, split_index)
+        conn.commit()
 
 
 def make_tables(conn, h5file, force=False):
@@ -134,18 +145,6 @@ def make_tables(conn, h5file, force=False):
         sql = 'INSERT INTO labels VALUES(?, ?, ?)'
         cursor.executemany(sql, labels)
         conn.commit()
-
-
-def index_all(conn, h5file):
-    cursor = conn.cursor()
-    sess = tf.Session()
-    with sess.as_default():
-        for split_index, folder in enumerate(
-                [BAL_TRAIN_PATH, UNBAL_TRAIN_PATH, EVAL_PATH]):
-            logging.info('Indexing %s' % folder.name)
-            index_folder(conn, h5file, folder, split_index)
-            conn.commit()
-    sess.close()
 
 
 class AudiosetManager():
