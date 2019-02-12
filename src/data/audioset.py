@@ -74,7 +74,8 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
                 ]])
             h5file.create_dataset(
                 name=video_id,
-                data=arr)
+                data=arr,
+                dtype='i8')
             h5file.flush()
         else:
             logging.warning('%s has already been indexed' % video_id)
