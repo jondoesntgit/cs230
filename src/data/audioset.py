@@ -13,6 +13,8 @@ import pandas as pd
 import sqlite3
 import tqdm
 import h5py
+import logging
+
 load_dotenv()
 
 AUDIOSET_PATH = os.getenv('AUDIOSET_PATH')
@@ -56,74 +58,84 @@ def index(sqlite_conn, h5file, force=False):
         conn.commit()
 
     # Populate the tables from the tfrecords
-    tfrecord_filenames = (str(f) for f in BAL_TRAIN_PATH.glob('*.tfrecord'))
+
 
     split_index = 0
-    tbar = tqdm.tqdm(list(tfrecord_filenames))
-    for tfrecord in tbar:
-        for example in tf.python_io.tf_record_iterator(tfrecord):
-            tf_example = tf.train.Example.FromString(example)
 
-            f = tf_example.features.feature
-            video_id = (f['video_id'].bytes_list.value[0]
-                        ).decode(encoding='UTF-8')
-            tbar.set_description('Indexing %s' % video_id)
+    sess = tf.Session()
+    with sess.as_default():
+      for folder in [BAL_TRAIN_PATH, EVAL_PATH, UNBAL_TRAIN_PATH]:
+        logging.info('Indexing %s' % folder.name)
+        tfrecord_filenames = (str(f) for f in folder.glob('*.tfrecord'))
+        tbar = tqdm.tqdm(list(tfrecord_filenames))
+        for tfrecord in tbar:
+            for example in tf.python_io.tf_record_iterator(tfrecord):
+                tf_example = tf.train.Example.FromString(example)
 
-            # TODO: This is not failproof. This may skip videos that have
-            # multiple labels
-            sql = 'SELECT COUNT(*) FROM labels_videos WHERE video_id = ?'
-            cursor.execute(sql, (video_id,))
-            num_rows = cursor.fetchone()[0]
-            if num_rows:
-                continue
+                f = tf_example.features.feature
+                video_id = (f['video_id'].bytes_list.value[0]
+                            ).decode(encoding='UTF-8')
+                tbar.set_description('Indexing %s' % video_id)
 
-            start_time_seconds = f['start_time_seconds'].float_list.value[0]
-            end_time_seconds = f['end_time_seconds'].float_list.value[0]
+                # TODO: This is not failproof. This may skip videos that have
+                # multiple labels
+                sql = 'SELECT COUNT(*) FROM labels_videos WHERE video_id = ?'
+                cursor.execute(sql, (video_id,))
+                num_rows = cursor.fetchone()[0]
+                if num_rows:
+                    continue
 
-            label_ids = list(np.asarray(
-                tf_example.features.feature['labels'].int64_list.value))
+                if len(f['start_time_seconds'].float_list.value) > 1:
+                    print(video_id)
+                start_time_seconds = (f['start_time_seconds']
+                                      ).float_list.value[0]
+                end_time_seconds = (f['end_time_seconds']
+                                    ).float_list.value[0]
 
-            tf_seq_example = tf.train.SequenceExample.FromString(example)
-            fl = tf_seq_example.feature_lists.feature_list['audio_embedding']
-            n_frames = len(fl.feature)
+                label_ids = list(np.asarray(
+                    tf_example.features.feature['labels'].int64_list.value))
 
-            with tf.Session() as sess:
+                tf_seq_example = tf.train.SequenceExample.FromString(example)
+                fl = (tf_seq_example.feature_lists
+                      ).feature_list['audio_embedding']
+                n_frames = len(fl.feature)
+
                 audio_frames = [tf.cast(tf.decode_raw(
                     fl.feature[i].bytes_list.value[0], tf.uint8), tf.uint8
                     ).eval()
                     for i in range(n_frames)]
 
-            arr = np.array(audio_frames)
-            try:
-                h5file.create_dataset(
-                    name=video_id,
-                    data=arr)
-                h5file.flush()
-            except RuntimeError:
-                print('Array for %s already exists' % video_id)
+                arr = np.array(audio_frames)
+                try:
+                    h5file.create_dataset(
+                        name=video_id,
+                        data=arr)
+                    h5file.flush()
+                except RuntimeError:
+                    print('Array for %s already exists' % video_id)
 
+                sql = (
+                    'INSERT INTO videos'
+                    '(video_id)'
+                    'VALUES (?)'
+                    )
+                cursor.execute(sql, (
+                    video_id,))
+                conn.commit()
 
-            sql = (
-                'INSERT INTO videos'
-                '(video_id)'
-                'VALUES (?)'
-                )
-            cursor.execute(sql, (
-                video_id,))
-            conn.commit()
+                sql = (
+                    'INSERT INTO labels_videos'
+                    '(video_id, label_id, split_id, start_time_seconds,'
+                    ' end_time_seconds)'
+                    'VALUES (?, ?, ?, ?, ?)'
+                    )
 
-            sql = (
-                'INSERT INTO labels_videos'
-                '(video_id, label_id, split_id, start_time_seconds,'
-                ' end_time_seconds)'
-                'VALUES (?, ?, ?, ?, ?)'
-                )
-
-            params = tuple((video_id, int(label_id), split_index,
-                            start_time_seconds, end_time_seconds)
-                           for label_id in label_ids)
-            cursor.executemany(sql, params)
-    conn.commit()
+                params = tuple((video_id, int(label_id), split_index,
+                                start_time_seconds, end_time_seconds)
+                               for label_id in label_ids)
+                cursor.executemany(sql, params)
+        conn.commit()
+    sess.close()
 
 
 class AudiosetManager():
@@ -167,7 +179,9 @@ class AudiosetManager():
                 return df[df.label_id.isin(labels)]
             return df
 
+
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
         with h5py.File(str(AUDIOSET_H5_DATABASE), 'a') as h5file:
             index(conn, h5file)
