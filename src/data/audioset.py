@@ -14,8 +14,6 @@ import sqlite3
 import tqdm
 import h5py
 import logging
-
-import profile
 load_dotenv()
 
 AUDIOSET_PATH = os.getenv('AUDIOSET_PATH')
@@ -41,8 +39,7 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
         tf_example = tf.train.Example.FromString(example)
 
         f = tf_example.features.feature
-        video_id = (f['video_id'].bytes_list.value[0]
-                    ).decode(encoding='UTF-8')
+        video_id = f['video_id'].bytes_list.value[0].decode(encoding='UTF-8')
         ebar.set_description('youtube.com/%s' % video_id)
 
         # TODO: This is not failproof. This may skip videos that have
@@ -67,25 +64,20 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
 
         length = 2 * 128
 
-        #for frame_index in range(n_frames):
-        #    hex_embed = fl.feature[frame_index].bytes_list.value[0].hex()
-        #    vals = [int(hex_embed[i:i+2], 16) for i in range(0, length, 2)]
-        #    audio_frames.append(vals)
-
-        audio_frames = [
-            [int(fl.feature[frame_index].bytes_list.value[0].hex()[i:i+2], 16) 
-            for i in range(0, length, 2)]
-            for frame_index in range(n_frames)
-        ]
-
         if video_id not in h5file.keys():
-            arr = np.array(audio_frames)
+            arr = np.array([
+            [int(hex_embed[i:i+2], 16) 
+                for i in range(0, length, 2)]
+            for hex_embed in [
+                fl.feature[frame_index].bytes_list.value[0].hex() 
+                for frame_index in range(n_frames)
+                ]])
             h5file.create_dataset(
                 name=video_id,
                 data=arr)
             h5file.flush()
         else:
-            logging.info('%s has already been indexed' % video_id)
+            logging.warning('%s has already been indexed' % video_id)
 
         sql = (
             'INSERT INTO videos'
@@ -109,7 +101,6 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
         cursor.executemany(sql, params)
 
 def index_folder(conn, h5file, folder, split_index):
-    cursor = conn.cursor()
     tfrecord_filenames = list(folder.glob('*.tfrecord'))
     tbar = tqdm.tqdm(tfrecord_filenames)
     for tfrecord in tbar:
