@@ -64,42 +64,44 @@ def index_tfrecord(conn, h5file, tfrecord, split_index):
 
         length = 2 * 128
 
-        if video_id not in h5file.keys():
+        try:
             arr = np.array([
-            [int(hex_embed[i:i+2], 16) 
-                for i in range(0, length, 2)]
-            for hex_embed in [
-                fl.feature[frame_index].bytes_list.value[0].hex() 
-                for frame_index in range(n_frames)
+                [int(hex_embed[i:i+2], 16)
+                    for i in range(0, length, 2)]
+                for hex_embed in [
+                    fl.feature[frame_index].bytes_list.value[0].hex()
+                    for frame_index in range(n_frames)
                 ]])
             h5file.create_dataset(
                 name=video_id,
                 data=arr,
                 dtype='i8')
             h5file.flush()
-        else:
+
+            sql = (
+                'INSERT INTO videos'
+                '(video_id)'
+                'VALUES (?)'
+                )
+            cursor.execute(sql, (
+                video_id,))
+            conn.commit()
+
+            sql = (
+                'INSERT INTO labels_videos'
+                '(video_id, label_id, split_id, start_time_seconds,'
+                ' end_time_seconds)'
+                'VALUES (?, ?, ?, ?, ?)'
+                )
+
+            params = tuple((video_id, int(label_id), split_index,
+                            start_time_seconds, end_time_seconds)
+                           for label_id in label_ids)
+            cursor.executemany(sql, params)
+
+        except Exception as e:
             logging.warning('%s has already been indexed' % video_id)
-
-        sql = (
-            'INSERT INTO videos'
-            '(video_id)'
-            'VALUES (?)'
-            )
-        cursor.execute(sql, (
-            video_id,))
-        conn.commit()
-
-        sql = (
-            'INSERT INTO labels_videos'
-            '(video_id, label_id, split_id, start_time_seconds,'
-            ' end_time_seconds)'
-            'VALUES (?, ?, ?, ?, ?)'
-            )
-
-        params = tuple((video_id, int(label_id), split_index,
-                        start_time_seconds, end_time_seconds)
-                       for label_id in label_ids)
-        cursor.executemany(sql, params)
+            logging.warning(str(e))
 
 def index_folder(conn, h5file, folder, split_index):
     tfrecord_filenames = list(folder.glob('*.tfrecord'))
@@ -186,7 +188,13 @@ class AudiosetManager():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    force = False
+    if force:
+        mode = 'w'
+    else:
+        mode = 'a'
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
-        with h5py.File(str(AUDIOSET_H5_DATABASE), 'w') as h5file:
-            make_tables(conn, h5file, force=True)
+        with h5py.File(str(AUDIOSET_H5_DATABASE), mode) as h5file:
+            # TODO: The force syntax doesn't seem to be working correctly
+            make_tables(conn, h5file, force=force)
             index_all(conn, h5file)
