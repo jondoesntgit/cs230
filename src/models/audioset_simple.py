@@ -28,6 +28,10 @@ if __name__ == '__main__':
     y_train = balanced_train_h5['y'][()].astype(int)
 
     num_labels = len(y_train[1])
+
+    non_zero_labels=[i for i, val in enumerate(np.sum(y_train, axis=0)) if val]
+    y_compressed = y_train[:,non_zero_labels]
+
     input_h = X_train.shape[1]
     input_w = X_train.shape[2]
 
