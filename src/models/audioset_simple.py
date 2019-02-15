@@ -40,19 +40,28 @@ if __name__ == '__main__':
 
     N_dense = int(5e2)
     lr = .001
-    N_epochs = 10
+    N_epochs = 3
     minibatch_size = 32
 
     model.add(tf.keras.layers.Flatten(input_shape=(input_h, input_w, 1)))
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
     model.add(tf.keras.layers.Dense(N_dense, activation='relu'))
-    model.add(tf.keras.layers.Dense(num_labels, activation='sigmoid'))
+    model.add(tf.keras.layers.Dense(len(non_zero_labels), activation='sigmoid'))
 
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr),
                   loss='binary_crossentropy',
                   metrics=['accuracy'])
 
-    model.fit(X_train, y_train, epochs=N_epochs, batch_size=minibatch_size)
+    model.fit(X_train, y_compressed, epochs=N_epochs, batch_size=minibatch_size)
+
+    # evaluate performance
+    eval_h5 = h5py.File(str(AUDIOSET_SPLITS_V1 / 'eval_top_5.h5'), 'r')
+    X_test = eval_h5['X'][()]
+    y_test = eval_h5['y'][()].astype(int)
+    y_test_compressed = y_test[:, non_zero_labels]
+
+    test_loss, test_acc = model.evaluate(X_test, y_test_compressed)
+    print('Test accuracy:', test_acc)
 
     model.save('audioset_simple.h5')
