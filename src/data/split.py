@@ -26,9 +26,14 @@ AUDIOSET_SPLITS_V1 = Path(AUDIOSET_SPLITS_V1).expanduser()
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     with sqlite3.connect(str(AUDIOSET_SQLITE_DATABASE)) as conn:
-        split_index = 0  # balanced train
+        split_index = 0
+                      # 0 for balanced train
+                      # 1 for eval
+                      # 2 for unbalanced train
+
         duration = 10 # seconds
         number_of_features = 128
+        number_of_labels = 50
 
         sql = """
         SELECT video_id, label_id FROM labels_videos
@@ -44,14 +49,20 @@ if __name__ == '__main__':
             WHERE labels_videos.split_id = {split_index} -- balanced train
             GROUP BY label_id
             ORDER BY COUNT(labels_videos.id) DESC
+            LIMIT {number_of_labels}
         );
-        """.format(split_index=split_index, duration=duration)
+        """.format(
+            split_index=split_index,
+            duration=duration,
+            number_of_labels=number_of_labels)
 
         cursor = conn.cursor()
         cursor.execute(sql)
         results = cursor.fetchall()
         all_set = {}
-        for slug, label in results:
+        logging.info('Building dictionary')
+        tbar = tqdm.tqdm(results)
+        for slug, label in tbar:
             if slug in all_set.keys():
                 all_set[slug].append(label)
             else:
@@ -59,15 +70,18 @@ if __name__ == '__main__':
 
     np.random.seed(42)
     keys = list(all_set.keys())
+    logging.info('Counting labels')
     labels = np.unique(reduce(operator.add, all_set.values()))
     number_of_labels = 527
     if len(labels) != number_of_labels:
         logging.warning('Found %i labels out of %i' % (len(labels), number_of_labels))
     number_of_features = 128
 
+    logging.info('Shuffling')
     np.random.shuffle(keys)
     train_keys = keys[:]  # Use the whole training set
 
+    logging.info('Allocating memory')
     m = len(train_keys)
     X = np.zeros(shape=(m, duration, number_of_features, 1), dtype=np.uint8)
     y = np.zeros((m, number_of_labels), dtype=bool)
@@ -88,7 +102,7 @@ if __name__ == '__main__':
 
     AUDIOSET_SPLITS_V1.mkdir(parents=True, exist_ok=True)
     balanced_train_h5file = h5py.File(
-        str(AUDIOSET_SPLITS_V1 / 'balanced_train.h5'), 'w')
+        str(AUDIOSET_SPLITS_V1 / 'balanced_train_top_50.h5'), 'w')
 
 
     logging.info('Writing to disk')
