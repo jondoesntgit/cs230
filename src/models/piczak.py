@@ -86,7 +86,7 @@ def main():
     """
 
     options, remainder = getopt.gnu_getopt(sys.argv[1:], 'e', ['epochs='])
-    epochs = 5
+    epochs = 50
     for opt, arg in options:
         if opt in ('-e', '--epochs'):
             if arg != "":
@@ -113,8 +113,9 @@ def main():
     logging.debug(f'X_test shape: {X_test.shape}')
     logging.debug(f'y_test shape: {y_test.shape}')
 
-    accuracy, model = run_piczak_model(X_train, y_train, X_test, y_test,
-                                       N_epochs=epochs)
+    accuracy, model = run_piczak_model(X_train, y_train, X_test, y_test, 
+        N_epochs=epochs, lr=0.001, N_filters=80, N_dense=2000, 
+        keep_prob=0.3, minibatch_size=32)
 
     model.save('piczak.h5')
 
