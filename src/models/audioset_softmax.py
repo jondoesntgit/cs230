@@ -10,6 +10,7 @@ import numpy as np
 from dotenv import load_dotenv
 import h5py
 import os
+from sklearn import metrics
 from pathlib import Path
 load_dotenv()
 
@@ -59,6 +60,20 @@ if __name__ == '__main__':
     X_train_reduced = X_train_reduced[ :int(num_examples*0.95)-1,:,:,:]
     Y_dev = Y_train_reduced[ int(num_examples*0.95):,:]
     Y_train_reduced = Y_train_reduced[ :int(num_examples*0.95)-1,:]
+    
+    # make a mini train set using first 5% of data to see overfitting.
+    X_train_mini = X_train_reduced[ :int(num_examples*0.05),:,:,:]
+    Y_train_mini = Y_train_reduced[ :int(num_examples*0.05),:]
+   
+    # make a micro train set with just 2 examples per class
+    num_examples_per_class = 2
+    Y_train_micro = np.zeros([N_classes*num_examples_per_class,N_classes])
+    X_train_micro = np.zeros([N_classes*num_examples_per_class,X_train.shape[1], X_train.shape[2],X_train.shape[3]])
+    for i in range(N_classes):
+        class_examples = np.nonzero(Y_train_reduced[:,i])
+        for j in range(num_examples_per_class):
+            Y_train_micro[num_examples_per_class*i + j,:]= Y_train_reduced[class_examples[0][j],:]
+            X_train_micro[num_examples_per_class*i + j,:,:,:]= X_train_reduced[class_examples[0][j],:,:,:]
 
     
     # dataset statistics:
@@ -67,6 +82,21 @@ if __name__ == '__main__':
     print(Y_train_reduced.shape[0])
     print("Number of examples per class in train set: ")
     print(n_examples_per_class)
+    
+    print("Total number of examples in mini train set:")
+    print(Y_train_mini.shape[0])
+    n_examples_per_class= np.sum(Y_train_mini, axis = 0, keepdims = True)
+    print("Number of examples per class in mini train set: ")
+    print(n_examples_per_class)
+    
+    print("Total number of examples in micro train set:")
+    print(Y_train_micro.shape[0])
+    n_examples_per_class= np.sum(Y_train_micro, axis = 0, keepdims = True)
+    print("Number of examples per class in micro train set: ")
+    print(n_examples_per_class)
+    
+    
+    
     print("Total number of examples in dev set:")
     print(Y_dev.shape[0])
     n_examples_per_class= np.sum(Y_dev, axis = 0, keepdims = True)
@@ -83,8 +113,8 @@ if __name__ == '__main__':
     
     N_hidden_layers = 3
     N_dense = int(2e3)
-    lr = .01
-    N_epochs = 4
+    lr = .001
+    N_epochs = 1000
     minibatch_size = 32
     N_filters = 256
     
@@ -126,7 +156,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    model.fit(X_train_reduced, Y_train_reduced, epochs=N_epochs, batch_size=minibatch_size)
+    model.fit(X_train_micro, Y_train_micro, epochs=N_epochs, batch_size=minibatch_size)
     
     #%% evaluate performance
 #    eval_h5 = h5py.File(str(AUDIOSET_SPLITS_V1 / 'eval.h5'), 'r')
@@ -144,9 +174,15 @@ if __name__ == '__main__':
     print(prediction_summary)
     print('Number of classes predicted: ' + str(np.sum(prediction_summary >= 1)))
     
-    target_summary = np.sum(y_test_compressed, axis=0,keepdims=True)
+    target_summary = np.sum(Y_dev, axis=0,keepdims=True)
     print('Actual class distribution')
     print(target_summary)
+    
+    
+    #%% create confusion matrix for dev set
+    
+    matrix = metrics.confusion_matrix(Y_dev.argmax(axis=1), predictions.argmax(axis=1))
+
     
     #%%
     #    model.save('audioset_simple.h5')
