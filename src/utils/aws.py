@@ -18,3 +18,10 @@ remote_filename = 'file.txt'
 bucket_name = 'cs230-deep-audio'
 
 s3.upload_file(local_filename, bucket_name, remote_filename)
+
+local_filename = '/tmp/foo.txt'
+remote_filename = 'fixtures/file2.txt'
+s3.download_file(bucket_name, remote_filename, local_filename)
+
+with open(local_filename, 'r') as f:
+    print(f.read())
