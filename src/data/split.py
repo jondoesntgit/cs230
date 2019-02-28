@@ -2,13 +2,11 @@ import numpy as np
 from pathlib import Path
 from dotenv import load_dotenv
 import os
-import pandas as pd
 import sqlite3
 import tqdm
 import h5py
 import logging
 import operator
-import sys
 from functools import reduce
 load_dotenv()
 
@@ -31,7 +29,7 @@ if __name__ == '__main__':
                       # 1 for eval
                       # 2 for unbalanced train
 
-        duration = 10 # seconds
+        duration = 10  # seconds
         number_of_features = 128
         number_of_labels = 1
 
@@ -74,7 +72,8 @@ if __name__ == '__main__':
     labels = np.unique(reduce(operator.add, all_set.values()))
     number_of_labels = 527
     if len(labels) != number_of_labels:
-        logging.warning('Found %i labels out of %i' % (len(labels), number_of_labels))
+        logging.warning('Found %i labels out of %i'
+                        % (len(labels), number_of_labels))
     number_of_features = 128
 
     logging.info('Shuffling')
@@ -104,18 +103,9 @@ if __name__ == '__main__':
     balanced_train_h5file = h5py.File(
         str(AUDIOSET_SPLITS_V1 / 'test.h5'), 'w')
 
-
     logging.info('Writing to disk')
     balanced_train_h5file.create_dataset(name='X', data=X)
     balanced_train_h5file.create_dataset(name='y', data=y)
     balanced_train_h5file.create_dataset(name='slugs', data=slugs, dtype='S11')
     logging.info('Complete')
     balanced_train_h5file.close()
-
-#asciiList = [n.encode("ascii", "ignore") for n in strList]
-#h5File.create_dataset('xxx', (len(asciiList),1),'S10', asciiList)
-
-    # Save these for unbalanced train
-    #test_keys = keys[0:5000]
-    #validate_keys = keys[5000:10000]
-    #train_keys = keys[10000:]
