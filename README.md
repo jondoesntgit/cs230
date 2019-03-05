@@ -43,3 +43,7 @@ As we build this repo more, make will automate more tasks.
 ## Organization
 
 Driven Data has a nice [template](https://drivendata.github.io/cookiecutter-data-science/) for data science projects. That template is more or less what we use in this repository
+
+## VGGish features
+
+`make vggish_params` downloads the parameters needed to do VGGish feature extraction

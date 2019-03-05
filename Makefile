@@ -10,6 +10,13 @@ $(CS230_RAW_DATA)/esc50:
 	git clone https://github.com/karoldvl/ESC-50 $(CS230_RAW_DATA)/esc50
 	curl storage.googleapis.com/us_audioset/youtube_corpus/v1/features/features.tar.gz -o /tmp/features.tar.gz
 
+vggish_params:
+	echo $(dir $(VGGISH_MODEL_CHECKPOINT))
+	mkdir -p $(dir $(VGGISH_MODEL_CHECKPOINT))
+	mkdir -p $(dir $(EMBEDDING_PCA_PARAMETERS))
+	curl -o $(VGGISH_MODEL_CHECKPOINT) https://storage.googleapis.com/audioset/vggish_model.ckpt
+	curl -o $(EMBEDDING_PCA_PARAMETERS) https://storage.googleapis.com/audioset/vggish_pca_params.npz
+
 audioset:
 	ifndef AUDIOSET_PATH
 	$(error AUDIOSET_PATH is not set)
