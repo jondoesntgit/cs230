@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+This is a short little executable script that takes a .wav file stored in
+~/Downloads/example.wav, and dumps out the numpy representation of the vggish
+features.
+
+The script is not yet complete.
+"""
 
 import tensorflow as tf
 import numpy as np
@@ -18,13 +25,15 @@ CHECKPOINT = str(Path(CHECKPOINT).expanduser())
 PCA_PARAMS = os.getenv('EMBEDDING_PCA_PARAMETERS')
 PCA_PARAMS = str(Path(PCA_PARAMS).expanduser())
 
+# This appears to be a fix for a common problem on macs...
+os.environ['KMP_DUPLICATE_LIB_OK']='True' # Hacky way to suppress a warning
 
 p = Path('~/Downloads/example.wav').expanduser()
 
 print(str(p))
 examples_batch = w2e(str(p))
 
-print(examples_batch)
+#print(examples_batch)
 
 with tf.Graph().as_default(), tf.Session() as sess:
 
@@ -44,6 +53,8 @@ with tf.Graph().as_default(), tf.Session() as sess:
     # Run inference and postprocessing.
     [embedding_batch] = sess.run([embedding_tensor],
                                  feed_dict={features_tensor: examples_batch})
-    print(embedding_batch)
     postprocessed_batch = pproc.postprocess(embedding_batch)
+
+    # Numpy array of shape (`t`, 128)
     print(postprocessed_batch)
+    print(postprocessed_batch.shape)
