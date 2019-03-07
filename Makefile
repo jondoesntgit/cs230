@@ -11,7 +11,6 @@ $(CS230_RAW_DATA)/esc50:
 	curl storage.googleapis.com/us_audioset/youtube_corpus/v1/features/features.tar.gz -o /tmp/features.tar.gz
 
 vggish_params:
-	echo $(dir $(VGGISH_MODEL_CHECKPOINT))
 	mkdir -p $(dir $(VGGISH_MODEL_CHECKPOINT))
 	mkdir -p $(dir $(EMBEDDING_PCA_PARAMETERS))
 	curl -o $(VGGISH_MODEL_CHECKPOINT) https://storage.googleapis.com/audioset/vggish_model.ckpt
@@ -27,6 +26,12 @@ audioset:
 
 features: | $(CS230_RAW_DATA)/esc50
 	cd ./src/features && python extract_features.py $(CS230_RAW_DATA)/esc50/audio/2-118459-B-32.wav
+
+docker:
+	docker build -t cs230 .
+
+docker-ssh:
+	docker run -i -t --entrypoint /bin/bash cs230
 
 $(ESC50_SPLITS)/train/train_data.npy \
 $(ESC50_SPLITS)/train/train_label.npy \

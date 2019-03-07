@@ -120,6 +120,10 @@ def main(conn):
         print(video_id)
         tmpfile = yt_dl(video_id, start_time, end_time, 44100, tmpdir.name)
         if tmpfile is None:
+            comment = "Youtube download failed"
+            sql = 'UPDATE embeddings set end_time=now(), comment=%s WHERE id=%s'
+            cur.execute(sql, (comment, id))
+            conn.commit()
             continue
         arr = wav2vggish(tmpfile, sess)
         tmpfile = tempfile.NamedTemporaryFile(suffix='.npy')
@@ -160,13 +164,14 @@ def yt_dl(yt_id, t_start, t_end, Fs, dir):
             #y_filtered = np.convolve(y_resampled, b_n, 'same')
 
             # Store original and filtered file
-            lib.output.write_wav(f'{dir}/{yt_id}.wav', y_resampled, Fs)
-            #lib.output.write_wav(Outfolder+'/'+yt_id+'_f.wav', y_filtered, Fs)
-            pass
+            clipped_file = f'{dir}/{yt_id}_clipped.wav'
+            lib.output.write_wav(clipped_file, y_resampled, Fs)
+            #lib.output.write_wav(Outfolder+'/'+yt_id+'_filtered.wav', y_filtered, Fs)
 
     except youtube_dl.utils.DownloadError:
         logging.error(f'ID: {yt_id} failed to download')
-    return f'{dir}/{yt_id}.wav'
+        return None
+    return clipped_file
 
 def upload_to_aws(file, key):
     s3 = boto3.client(
