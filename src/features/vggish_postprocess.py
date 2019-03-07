@@ -16,8 +16,9 @@
 """Post-process embeddings from VGGish."""
 
 import numpy as np
-
-import vggish_params
+import sys
+sys.path.append('..')
+from features import vggish_params
 
 
 class Postprocessor(object):
