@@ -99,8 +99,9 @@ def main(conn):
         (SELECT id, video_id, filter_id from embeddings
         WHERE start_time IS NULL LIMIT %s) sub
     INNER JOIN videos on videos.id=sub.video_id
-    WHERE embeddings.id=sub.id
-    RETURNING sub.id, sub.video_id, sub.filter_id, videos.start_time, videos.end_time;
+    INNER JOIN filters on filters.id=sub.filter_id
+    WHERE embeddings.id=sub.id AND filters.id=sub.filter_id
+    RETURNING sub.id, sub.video_id, sub.filter_id, videos.start_time, videos.end_time, filters.coefficients;
     """
     cur.execute(sql, (hostname, my_limit))
     conn.commit()
@@ -116,9 +117,9 @@ def main(conn):
 
     tmpdir = tempfile.TemporaryDirectory()
     for row in rows:
-        id, video_id, filter_id, start_time, end_time = row
+        id, video_id, filter_id, start_time, end_time, b_n = row
         print(video_id)
-        tmpfile = yt_dl(video_id, start_time, end_time, 44100, tmpdir.name)
+        tmpfile = yt_dl(video_id, start_time, end_time, 44100, tmpdir.name, b_n)
         if tmpfile is None:
             comment = "Youtube download failed"
             sql = 'UPDATE embeddings set end_time=now(), comment=%s WHERE id=%s'
@@ -137,7 +138,7 @@ def main(conn):
 
     sess.close()
 
-def yt_dl(yt_id, t_start, t_end, Fs, dir):
+def yt_dl(yt_id, t_start, t_end, Fs, dir, b_n):
     ydl_opts = {
         'outtmpl': f'{dir}/{yt_id}.wav',
         'format': 'bestaudio/best',
@@ -161,17 +162,18 @@ def yt_dl(yt_id, t_start, t_end, Fs, dir):
             y_resampled = lib.util.fix_length(y_resampled, int((10)*Fs))
             print(f'y_resampled length = {y_resampled.shape}')
             # filter .wav
-            #y_filtered = np.convolve(y_resampled, b_n, 'same')
+            y_filtered = np.convolve(y_resampled, b_n, 'same')
 
             # Store original and filtered file
             clipped_file = f'{dir}/{yt_id}_clipped.wav'
+            filtered_file = f'{dir}/{yt_id}_filtered.wav'
             lib.output.write_wav(clipped_file, y_resampled, Fs)
-            #lib.output.write_wav(Outfolder+'/'+yt_id+'_filtered.wav', y_filtered, Fs)
+            lib.output.write_wav(filtered_file, y_filtered, Fs)
 
     except youtube_dl.utils.DownloadError:
         logging.error(f'ID: {yt_id} failed to download')
         return None
-    return clipped_file
+    return filtered_file
 
 def upload_to_aws(file, key):
     s3 = boto3.client(
@@ -258,5 +260,3 @@ if __name__ == '__main__':
         # Only do this once from a main computer
         #populate(conn)
         main(conn)
-
-
