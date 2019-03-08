@@ -7,7 +7,7 @@ and stores them on AWS
 import sys
 sys.path.append('..')
 from features import vggish_slim, vggish_params, vggish_postprocess, mel_features
-from features.vggish_input import wavfile_to_examples as w2e
+from features.vggish_input import waveform_to_examples as w2e
 from pathlib import Path
 from dotenv import load_dotenv
 import os
@@ -90,10 +90,9 @@ CREATE TABLE embeddings (
 );
 """
 
-def main(conn):
+def main(conn, num_videos_to_grab):
     cur = conn.cursor()
     hostname = socket.gethostname()
-    my_limit = 1
     sql = """
     UPDATE embeddings SET worker=%s, start_time=now() FROM
         (SELECT id, video_id, filter_id from embeddings
@@ -103,7 +102,7 @@ def main(conn):
     WHERE embeddings.id=sub.id AND filters.id=sub.filter_id
     RETURNING sub.id, sub.video_id, sub.filter_id, videos.start_time, videos.end_time, filters.coefficients;
     """
-    cur.execute(sql, (hostname, my_limit))
+    cur.execute(sql, (hostname, num_videos_to_grab))
     conn.commit()
     rows = cur.fetchall()
     tf.Graph().as_default()
@@ -119,7 +118,8 @@ def main(conn):
     for row in rows:
         id, video_id, filter_id, start_time, end_time, b_n = row
         print(video_id)
-        tmpfile = yt_dl(video_id, start_time, end_time, 44100, tmpdir.name, b_n)
+        tmpdir_name = tmpdir.name
+        tmpfile = yt_dl(video_id, start_time, end_time, 44100, tmpdir_name, b_n)
         if tmpfile is None:
             comment = "Youtube download failed"
             sql = 'UPDATE embeddings set end_time=now(), comment=%s WHERE id=%s'
@@ -127,11 +127,13 @@ def main(conn):
             conn.commit()
             continue
         arr = wav2vggish(tmpfile, sess)
-        tmpfile = tempfile.NamedTemporaryFile(suffix='.npy')
-        np.save(tmpfile, arr)
+        npy_file = f'{tmpdir_name}/{video_id}.npy'
+        print(arr)
+        np.save(npy_file, arr)
         aws_key = f'filter{filter_id}/{video_id}.npy'
-        upload_to_aws(tmpfile.name, aws_key)
-        tmpfile.close()
+        print(f'Uploading from {npy_file}')
+        upload_to_aws(npy_file, aws_key)
+        print('Upload complete')
         sql = 'UPDATE embeddings set end_time=now(), aws_key=%s WHERE id=%s'
         cur.execute(sql, (aws_key, id))
         conn.commit()
@@ -173,6 +175,7 @@ def yt_dl(yt_id, t_start, t_end, Fs, dir, b_n):
     except youtube_dl.utils.DownloadError:
         logging.error(f'ID: {yt_id} failed to download')
         return None
+    return clipped_file
     return filtered_file
 
 def upload_to_aws(file, key):
@@ -181,7 +184,6 @@ def upload_to_aws(file, key):
         aws_access_key_id=AWS_ACCESS_KEY_ID,
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
         )
-
     bucket_name = 'cs230-deep-audio'
     local_filename = str(file)
     remote_filename = key
@@ -194,7 +196,8 @@ def wav2vggish(file, sess):
         vggish_params.INPUT_TENSOR_NAME)
     embedding_tensor = sess.graph.get_tensor_by_name(
         vggish_params.OUTPUT_TENSOR_NAME)
-    examples_batch = w2e(file)
+    y, sr = lib.load(str(file))
+    examples_batch = w2e(y, sr)
     # Run inference and postprocessing.
     [embedding_batch] = sess.run([embedding_tensor],
                                  feed_dict={features_tensor: examples_batch})
@@ -259,4 +262,10 @@ if __name__ == '__main__':
 
         # Only do this once from a main computer
         #populate(conn)
-        main(conn)
+        try:
+            main(conn, 20)
+        except Exception as e:
+            cur = conn.cursor()
+            cur.execute('INSERT INTO errors (description) VALUES (%s);', (str(e),))
+            conn.commit()
+

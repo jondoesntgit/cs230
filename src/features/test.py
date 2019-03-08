@@ -14,11 +14,12 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append('..')
-from features.vggish_input import wavfile_to_examples as w2e
+from features.vggish_input import waveform_to_examples as w2e
 from features import vggish_slim, vggish_postprocess, vggish_params
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import librosa as lib
 
 load_dotenv()
 CHECKPOINT = os.getenv('VGGISH_MODEL_CHECKPOINT')
@@ -35,7 +36,8 @@ if len(sys.argv) >= 2:
     p = Path(sys.argv[1])
 
 print(str(p))
-examples_batch = w2e(str(p))
+y, sr = lib.load(str(p))
+examples_batch = w2e(y, sr)
 
 #print(examples_batch)
 

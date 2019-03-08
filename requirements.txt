@@ -2,9 +2,9 @@ numpy
 tensorflow
 librosa
 boto3
-psycopg2
+psycopg2_binary
 python_dotenv
 youtube_dl
 resampy
 soundfile
-
+requests
