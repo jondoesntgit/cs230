@@ -10,6 +10,7 @@ The script is not yet complete.
 import tensorflow as tf
 import numpy as np
 from scipy.io import wavfile
+import matplotlib.pyplot as plt
 
 import sys
 sys.path.append('..')
@@ -28,7 +29,10 @@ PCA_PARAMS = str(Path(PCA_PARAMS).expanduser())
 # This appears to be a fix for a common problem on macs...
 os.environ['KMP_DUPLICATE_LIB_OK']='True' # Hacky way to suppress a warning
 
+print(sys.argv)
 p = Path('~/Downloads/example.wav').expanduser()
+if len(sys.argv) >= 2:
+    p = Path(sys.argv[1])
 
 print(str(p))
 examples_batch = w2e(str(p))
@@ -39,6 +43,8 @@ with tf.Graph().as_default(), tf.Session() as sess:
 
     # Prepare a postprocessor to munge the model embeddings.
     pproc = vggish_postprocess.Postprocessor(PCA_PARAMS)
+    print(examples_batch)
+    print(examples_batch.shape)
 
     # Define the model in inference mode, load the checkpoint, and
     # locate input and output tensors.
@@ -58,3 +64,5 @@ with tf.Graph().as_default(), tf.Session() as sess:
     # Numpy array of shape (`t`, 128)
     print(postprocessed_batch)
     print(postprocessed_batch.shape)
+    plt.imshow(postprocessed_batch)
+    plt.show()
