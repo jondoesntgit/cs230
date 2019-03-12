@@ -31,7 +31,7 @@ AUDIOSET_SPLITS_V1 = Path(AUDIOSET_SPLITS_V1).expanduser()
 if __name__ == '__main__':
 
     #%% load data numpy files
-    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_7_classes_v1.pickle'), 'rb')
+    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_7_classes_v2.pickle'), 'rb')
     data = pkl.load(pickle_in)
     (X_train_reduced, Y_train_reduced, X_dev, Y_dev) = data
     
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     print(dev_confusion_matrix)
     
     #%%
-#    model.save('audioset_softmax_v02_dropout_0p5.h5')
+#   model.save('audioset_softmax_run46.h5')
 
 
 
