@@ -62,7 +62,8 @@ CREATE TABLE videos (
 CREATE TABLE labels (
     id CHARACTER(20) PRIMARY KEY,
     display_name CHARACTER(50) UNIQUE,
-    parent_id CHARACTER(20) REFERENCES labels (id)
+    parent_id CHARACTER(20) REFERENCES labels (id),
+    index integer
 );
 
 CREATE TABLE labels_videos (
@@ -209,22 +210,39 @@ def wav2vggish(file, sess):
 
 
 def populate(conn):
-
+    print('Populating database')
     cur = conn.cursor()
 
     url = 'https://raw.githubusercontent.com/audioset/ontology/master/ontology.json'
     ontology = requests.get(url).content.decode()
     ontology = json.loads(ontology)
+    print('Populating labels')
     for label in ontology:
         break # We already did this once....
         id = label['id']
         display_name = label['name']
-        sql = 'INSERT INTO labels (id, display_name) VALUES (%s, %s);'
+        sql = 'INSERT INTO labels (id, display_name) VALUES (%s, %s) ON CONFLICT DO NOTHING;'
         cur.execute(sql, (label['id'], label['name']))
         conn.commit()
         print(id)
 
+    url = 'http://storage.googleapis.com/us_audioset/youtube_corpus/v1/csv/class_labels_indices.csv'
+    class_labels_indices = requests.get(url).content.decode()
+    for line in class_labels_indices.split('\n'):
+        try:
+            splits = line.split(',')
+            id_number = int(splits[0])
+            id_string = splits[1]
+            sql = 'UPDATE labels SET index=%s WHERE id=%s;'
+            cur.execute(sql, (id_number, id_string))
+            conn.commit()
+            print(id_number, id_string)
+        except:
+            continue
 
+    return
+
+    print('Populating videos')
     # BALANCED TRAIN
     urls = [
         'http://storage.googleapis.com/us_audioset/youtube_corpus/v1/csv/balanced_train_segments.csv'
@@ -240,12 +258,14 @@ def populate(conn):
                 labels = labels.split(',')
                 start = float(start)
                 end = float(end)
-                sql = 'INSERT INTO videos (id, start_time, end_time) VALUES (%s, %s, %s) returning id;'
+                sql = 'INSERT INTO videos (id, start_time, end_time) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING returning id;'
                 cur.execute(sql, (slug, start, end))
                 video_id = cur.fetchone()
                 print(video_id)
+                if video_id is None:
+                    continue
                 for label in labels:
-                    sql = 'INSERT INTO labels_videos (video_id, label_id) VALUES (%s, %s);'
+                    sql = 'INSERT INTO labels_videos (video_id, label_id) VALUES (%s, %s) ON CONFLICT DO NOTHING;'
                     cur.execute(sql, (video_id, label))
                 conn.commit()
                 #print(line, start, end, labels)
@@ -261,7 +281,8 @@ if __name__ == '__main__':
             password=PSQL_PASSWORD) as conn:
 
         # Only do this once from a main computer
-        #populate(conn)
+        populate(conn)
+        exit()
         try:
             main(conn, 20)
         except Exception as e:

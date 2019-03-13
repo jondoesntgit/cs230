@@ -10,7 +10,7 @@ import dotenv
 import os
 from pathlib import Path
 import tempfile
-import tables as pt
+import h5py
 
 dotenv.load_dotenv()
 
@@ -23,7 +23,7 @@ AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 BUCKET_NAME = 'cs230-deep-audio'
 
-def get_aws_keys(filter_id, limit='NULL'):
+def get_aws_keys(filter_id, limit=None):
     conn = psycopg2.connect(
             host=PSQL_HOSTNAME,
             database=PSQL_DATABASE,
@@ -32,19 +32,24 @@ def get_aws_keys(filter_id, limit='NULL'):
 
     cur = conn.cursor()
     query = '''
-    SELECT video_id, aws_key FROM embeddings 
-    WHERE aws_key IS NOT NULL 
+    SELECT video_id, aws_key, array(
+        SELECT labels.index FROM labels_videos
+        INNER JOIN labels ON labels_videos.label_id = labels.id
+        WHERE embeddings.video_id=labels_videos.video_id
+    ) FROM embeddings
+    WHERE aws_key IS NOT NULL
     AND filter_id = %s
     LIMIT %s;
     '''
     cur.execute(query, (filter_id, limit));
 
     return_dict = {
-        row[0]: row[1].strip() for row in cur.fetchall()
+        row[0]: {"aws_key": row[1].strip(), "labels": row[2]} for row in cur.fetchall()
     }
 
     conn.close()
     return return_dict
+
 
 def download_embeddings(aws_keys_dict, local_dir=None, verbose=True):
     """Return a list of downloaded filenames."""
@@ -55,7 +60,6 @@ def download_embeddings(aws_keys_dict, local_dir=None, verbose=True):
     else:
         Path(local_dir).mkdir(parents=True, exist_ok=True)
 
-
     s3 = boto3.client(
         's3',
         # Hard coded strings as credentials, not recommended.
@@ -63,7 +67,14 @@ def download_embeddings(aws_keys_dict, local_dir=None, verbose=True):
         aws_secret_access_key=AWS_SECRET_ACCESS_KEY
     )
 
-    iter_list = aws_keys_dict.values()
+    iter_list = [aws_keys_dict[key]['aws_key'] for key in aws_keys_dict]
+    labels_list = [aws_keys_dict[key]['labels'] for key in aws_keys_dict]
+    # Convert to multi-hot
+    multi_hot_labels = np.zeros((len(labels_list), 527))
+    for i, labels in enumerate(labels_list):
+        for l in labels:
+            multi_hot_labels[i,l] = 1
+
     ret_list = []
     if verbose:
         iter_list = tqdm.tqdm(iter_list)
@@ -72,7 +83,7 @@ def download_embeddings(aws_keys_dict, local_dir=None, verbose=True):
         local_filename.parent.mkdir(parents=True, exist_ok=True)
         ret_list.append(local_filename)
         s3.download_file(BUCKET_NAME, remote_filename, str(local_filename))
-    return ret_list
+    return ret_list, multi_hot_labels
 
 
 if __name__ == '__main__':
@@ -80,7 +91,7 @@ if __name__ == '__main__':
     parser.add_option('-f', '--filter', dest='filter_id', type="int", help='The id of the filter to query')
     parser.add_option('-q', '--quiet', dest='quiet', help='Suppress debug information')
     parser.add_option('-o', '--outfile', dest='output_file', type="string", help='File to output all the concatenated data to (h5)')
-    parser.add_option('-l', '--limit', dest='output_file', type='int', help='Limit the total number of examples. Defaults to all examples')
+    parser.add_option('-l', '--limit', dest='limit', type='int', help='Limit the total number of examples. Defaults to all examples')
     parser.add_option('-d', '--localdir', dest='local_directory', type='string', default=None, help='A working directory to write all of the embeddings to. Defaults to a temporary directory.')
 
     options, args = parser.parse_args()
@@ -90,7 +101,8 @@ if __name__ == '__main__':
 
     filter_id = options.filter_id
     output_file = options.output_file
-    limit = options.limit or 'NULL'
+    output_file = str(Path(output_file).expanduser())
+    limit = options.limit
     local_dir = options.local_directory
 
     if filter_id is None:
@@ -103,14 +115,14 @@ if __name__ == '__main__':
     output_file_as_path.parent.mkdir(parents=True, exist_ok=True)
 
     aws_key_dict = get_aws_keys(filter_id=filter_id, limit=limit)
-    npy_files = download_embeddings(aws_key_dict, local_dir=local_directory)
+    npy_files, multi_hot_labels = download_embeddings(
+        aws_key_dict, local_dir=local_dir)
 
-    print(npy_files)
     X = np.stack([np.load(npy_file) for npy_file in npy_files])
-    y = None
-    slugs = aws_key_dict.values()
+    y = multi_hot_labels
+    slugs = np.array(list(aws_key_dict.keys())).astype('S11')
 
-    h5file = pt.open_file(str(output_file), mode='w')
+    h5file = h5py.File(str(output_file), mode='w')
     h5file['X'] = X
     h5file['y'] = y
     h5file['slugs'] = slugs
