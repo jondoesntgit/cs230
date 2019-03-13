@@ -58,12 +58,12 @@ if __name__ == '__main__':
 
     
     #%% parameters
-    N_hidden_layers = 3
-    N_dense = int(1e3)
-    lr = 1e-4
+    N_hidden_layers = 1
+    N_dense = int(100)
+    lr = 1e-3
     minibatch_size = 32
-    N_filters = 256
-    drop_prob = 0.5
+    N_filters = 32
+    drop_prob = 0
     seed = 1
     
     
@@ -133,7 +133,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 1
+    N_epochs = 50
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
@@ -226,7 +226,7 @@ if __name__ == '__main__':
 #    print(dev_confusion_matrix)
     
     #%%
-#   model.save('audioset_softmax_run46.h5')
+   model.save('audioset_multilabel_M9.h5')
 
 
 
