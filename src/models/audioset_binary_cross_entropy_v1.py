@@ -64,7 +64,7 @@ if __name__ == '__main__':
     lr = 1e-4
     minibatch_size = 32
     N_filters = 64
-    drop_prob = 0.2
+    drop_prob = 0.5
     seed = 1
     
     
@@ -134,7 +134,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 20
+    N_epochs = 110
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
@@ -231,7 +231,7 @@ if __name__ == '__main__':
 #    print(dev_confusion_matrix)
     
     #%%
-#   model.save('audioset_multilabel_M18.h5')
+#   model.save('audioset_multilabel_M19.h5')
 
 
 
