@@ -6,15 +6,12 @@ and stores them on AWS
 """
 import sys
 sys.path.append('..')
-from features import vggish_slim, vggish_params, vggish_postprocess, mel_features
-from features.vggish_input import waveform_to_examples as w2e
 from pathlib import Path
 from dotenv import load_dotenv
 import os
 import boto3
 import librosa as lib
 
-import tensorflow as tf
 import numpy as np
 
 import psycopg2
@@ -38,111 +35,45 @@ PSQL_DATABASE = os.getenv('PSQL_DATABASE')
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-CHECKPOINT = os.getenv('VGGISH_MODEL_CHECKPOINT')
-CHECKPOINT = str(Path(CHECKPOINT).expanduser())
-PCA_PARAMS = os.getenv('EMBEDDING_PCA_PARAMETERS')
-PCA_PARAMS = str(Path(PCA_PARAMS).expanduser())
-
-# This appears to be a fix for a common problem on macs...
-os.environ['KMP_DUPLICATE_LIB_OK']='True' # Hacky way to suppress a warning in vggish extraction
-
-
-CREATE_TABLES = """
-
-CREATE TYPE split AS ENUM ('train', 'dev', 'test');
-
-CREATE TABLE videos (
-    id CHARACTER(11) PRIMARY KEY,
-    start_time integer,
-    end_time integer,
-    split split,
-    UNIQUE (id, start_time, end_time)
-);
-
-CREATE TABLE labels (
-    id CHARACTER(20) PRIMARY KEY,
-    display_name CHARACTER(50) UNIQUE,
-    parent_id CHARACTER(20) REFERENCES labels (id),
-    index integer
-);
-
-CREATE TABLE labels_videos (
-    id serial PRIMARY KEY,
-    video_id CHARACTER(11) REFERENCES videos (id),
-    label_id CHARACTER(20) REFERENCES labels (id),
-    UNIQUE (video_id, label_id)
-);
-
-CREATE TABLE filters (
-    id serial PRIMARY KEY,
-    comments CHARACTER(200)
-);
-
-CREATE TABLE embeddings (
-    id serial PRIMARY KEY,
-    video_id CHARACTER(11) NOT NULL REFERENCES videos (id),
-    filter_id integer NOT NULL REFERENCES filters (id),
-    worker CHARACTER(200),
-    start_time TIMESTAMP,
-    end_time TIMESTAMP,
-    aws_key CHARACTER(60),
-    aws_wav_key CHARACTER(40),
-    UNIQUE (video_id, filter_id),
-    UNIQUE (aws_key)
-);
-"""
-
 def main(conn, num_videos_to_grab):
     cur = conn.cursor()
     hostname = socket.gethostname()
     sql = """
-    UPDATE embeddings SET worker=%s, start_time=now() FROM
+    SELECT sub.id, sub.video_id, sub.filter_id, videos.start_time, videos.end_time, filters.coefficients FROM
         (SELECT id, video_id, filter_id from embeddings
-        WHERE start_time IS NULL LIMIT %s) sub
+        WHERE aws_wav_key IS NULL LIMIT %s) sub
     INNER JOIN videos on videos.id=sub.video_id
     INNER JOIN filters on filters.id=sub.filter_id
-    WHERE embeddings.id=sub.id AND filters.id=sub.filter_id
-    RETURNING sub.id, sub.video_id, sub.filter_id, videos.start_time, videos.end_time, filters.coefficients;
+    -- WHERE embeddings.id=sub.id AND filters.id=sub.filter_id
+    ;
     """
-    cur.execute(sql, (hostname, num_videos_to_grab))
+    cur.execute(sql, (num_videos_to_grab,))
     conn.commit()
     rows = cur.fetchall()
-    tf.Graph().as_default()
-    sess = tf.Session()
+    logging.info(f'Fetched {len(rows)} videos')
 
     # Define the model in inference mode, load the checkpoint, and
     # locate input and output tensors.
 
-    vggish_slim.define_vggish_slim(training=False)
-    vggish_slim.load_vggish_slim_checkpoint(sess, CHECKPOINT)
-
     tmpdir = tempfile.TemporaryDirectory()
     for row in rows:
         id, video_id, filter_id, start_time, end_time, b_n = row
-        print(video_id)
+        logging.info(f'Processing {video_id}')
         tmpdir_name = tmpdir.name
         clipped_file, filtered_file = yt_dl(video_id, start_time, end_time, 44100, tmpdir_name, b_n)
         if filtered_file is None:
-            comment = "Youtube download failed"
-            sql = 'UPDATE embeddings set end_time=now(), comment=%s WHERE id=%s'
-            cur.execute(sql, (comment, id))
+            comment = "Youtube download failed: %s" % video_id
+            sql = 'INSERT INTO errors (timestamp, description) VALUES(timestamp=now(), description=%s);s'
+            cur.execute(sql, (comment))
             conn.commit()
             continue
-        arr = wav2vggish(filtered_file, sess)
-        npy_file = f'{tmpdir_name}/{video_id}.npy'
-        np.save(npy_file, arr)
-        aws_key = f'filter{filter_id}/{video_id}.npy'
-        print(f'Uploading from {npy_file}')
-        upload_to_aws(npy_file, aws_key)
-
         aws_wav_key = f'wav/f{filter_id}/{video_id}.wav'
         logging.info(f'Uploading from {filtered_file}')
         upload_to_aws(filtered_file, aws_wav_key)
         upload_to_aws(clipped_file, f'wav/fraw/{video_id}.wav')
-
-        print('Upload complete')
-        sql = 'UPDATE embeddings set end_time=now(), aws_key=%s, aws_wav_key=%s WHERE id=%s'
-        cur.execute(sql, (aws_key, aws_wav_key, id))
+        logging.info('Upload complete')
+        sql = 'UPDATE embeddings SET aws_wav_key=%s WHERE id=%s'
+        cur.execute(sql, (aws_wav_key, id))
         conn.commit()
 
     sess.close()
@@ -194,25 +125,6 @@ def upload_to_aws(file, key):
     local_filename = str(file)
     remote_filename = key
     s3.upload_file(local_filename, bucket_name, remote_filename)
-
-def wav2vggish(file, sess):
-    # Prepare a postprocessor to munge the model embeddings.
-    pproc = vggish_postprocess.Postprocessor(PCA_PARAMS)
-    features_tensor = sess.graph.get_tensor_by_name(
-        vggish_params.INPUT_TENSOR_NAME)
-    embedding_tensor = sess.graph.get_tensor_by_name(
-        vggish_params.OUTPUT_TENSOR_NAME)
-    y, sr = lib.load(str(file))
-    examples_batch = w2e(y, sr)
-    # Run inference and postprocessing.
-    [embedding_batch] = sess.run([embedding_tensor],
-                                 feed_dict={features_tensor: examples_batch})
-    postprocessed_batch = pproc.postprocess(embedding_batch)
-
-    # Numpy array of shape (`t`, 128)
-    return postprocessed_batch
-
-
 
 def populate(conn):
     print('Populating database')
@@ -279,6 +191,7 @@ def populate(conn):
                 print(e)
 
 if __name__ == '__main__':
+    logging.info('Starting')
     with psycopg2.connect(
             host=PSQL_HOSTNAME,
             database=PSQL_DATABASE,
@@ -288,5 +201,11 @@ if __name__ == '__main__':
         # Only do this once from a main computer
         #populate(conn)
         #exit()
-        while True:
-            main(conn, 20)
+        #try:
+        main(conn, 20)
+        #except Exception as e:
+        #    logging.error(e)
+        #    cur = conn.cursor()
+        #    cur.execute('INSERT INTO errors (description) VALUES (%s);', (str(e),))
+        #    conn.commit()
+
