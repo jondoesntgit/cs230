@@ -12,6 +12,11 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>   
 
       <title>{{ title }}</title>
+      <style>
+        img {
+          width: 100%;
+        }
+      </style>
    </head>
    <body>
     <div class="container">
@@ -36,11 +41,36 @@
       </div>
       <div class="row">
         <div class="col-sm">
-         <ul>
-           {% for item in items %}
-             <li>{{ escape(item) }}</li>
-           {% end %}
-         </ul>
+         <h2>Mel Spectrogram</h2>
+         <img id='mel' src="" />
+
+         <h2>VGGish features</h2>
+         <img id='vggish' src="" />
+
+         <h2>Predictions</h2>
+         <table>
+          <thead>
+            <tr>
+              <th>Male speech</th>
+              <th>Female speech</th>
+              <th>Bird</th>
+              <th>Engine</th>
+              <th>Siren</th>
+              <th>Water</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="t0">?</td>
+              <td id="t1">?</td>
+              <td id="t2">?</td>
+              <td id="t3">?</td>
+              <td id="t4">?</td>
+              <td id="t5">?</td>
+            </tr>
+          </tbody>
+         </table>
+
        </div>
      </div>
     </div>

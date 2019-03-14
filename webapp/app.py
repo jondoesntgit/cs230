@@ -1,6 +1,7 @@
 import tornado.ioloop
 import tornado.web
 import tornado.autoreload
+import tornado.websocket
 import os
 import json
 from pathlib import Path
@@ -27,7 +28,9 @@ CLASSIFIER_PATH = 'audioset_multilabel_M18.h5'
 def get_mel_spectrogram(y, sr):
     arr = librosa.feature.melspectrogram(y=y, sr=sr)
     plt.imshow(arr)
-    plt.savefig('processed/mel.png', dpi=300)
+    plt.ylabel('Frequency')
+    plt.xlabel('Time')
+    plt.savefig('processed/mel.png', dpi=300, bbox_inches='tight')
     return 'processed/mel.png'
 
 def get_vggish_features(y, sr):
@@ -53,7 +56,9 @@ def get_vggish_features(y, sr):
 
         # Numpy array of shape (`t`, 128)
         plt.imshow(postprocessed_batch)
-        plt.savefig('processed/vggish.png', dpi=300)
+        plt.xlabel('Feature')
+        plt.ylabel('Time')
+        plt.savefig('processed/vggish.png', dpi=300, bbox_inches='tight')
         return 'processed/vggish.png', postprocessed_batch
 
 class MainHandler(tornado.web.RequestHandler):
@@ -75,32 +80,44 @@ class AudioUploadHandler(tornado.web.RequestHandler):
         p = Path('uploads/tmp.wav')
         with p.open('wb') as f:
             f.write(file['body'])
+        self.write(json.dumps({'localFile': 'tmp.wav'}))
+
+        #r = json.dumps({'status': 'okay'})
+        #self.write(r)
+
+class EchoWebSocket(tornado.websocket.WebSocketHandler):
+    def open(self):
+        print('WebSocket opened')
+
+    def on_message(self, message):
+        print(f'Processing {message}')
+        p = Path('uploads') / message
+        #self.write_message(u'You said: ' + message)
+
         y, sr = librosa.load(str(p))
         mel_path = get_mel_spectrogram(y, sr)
+        self.write_message(json.dumps({'mel_path':  mel_path}))
+
         vggish_path, vggish_features = get_vggish_features(y, sr)
-
-
-        CLASSIFIER_PATH = 'audioset_multilabel_M18.h5'
-
-        #%% load classifier model
-        classifier = tf.keras.models.load_model(CLASSIFIER_PATH)
+        self.write_message(json.dumps({'vggish_path': vggish_path}))
 
         vggish_features = vggish_features[np.newaxis,:,:,np.newaxis]
-        print(vggish_features.shape)
-        prediction = classifier.predict(vggish_features)
+        #print(vggish_features.shape)
+                #%% load classifier model
+        classifier = tf.keras.models.load_model(CLASSIFIER_PATH)
+        prediction = classifier.predict(vggish_features)[0]
+        self.write_message(json.dumps({'labels': prediction.tolist()}))
 
-        #file = self.request.files['input'][0]
-        #print(data)
-        r = json.dumps({'status': 'okay'})
-        self.write(r)
-
-#class EchoWebSocket
+    def on_close(self):
+        print('Webscoetk closed')
 
 def make_app():
     return tornado.web.Application([
         (r"/", MainHandler),
         (r'/upload_audio', AudioUploadHandler),
-        (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': 'static/'})
+        (r'/websocket', EchoWebSocket),
+        (r'/static/(.*)', tornado.web.StaticFileHandler, {'path': 'static/'}),
+        (r'/processed/(.*)', tornado.web.StaticFileHandler, {'path': 'processed/'})
     ], gzpi=True)
 
 if __name__ == "__main__":
