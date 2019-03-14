@@ -31,7 +31,7 @@ AUDIOSET_SPLITS_V1 = Path(AUDIOSET_SPLITS_V1).expanduser()
 if __name__ == '__main__':
 
     #%% load data numpy files
-    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_multi_label_v1.pickle'), 'rb')
+    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_multi_label_w_negs_v2.pickle'), 'rb')
     data = pkl.load(pickle_in)
     (X_train_reduced, Y_train_reduced, X_dev, Y_dev) = data
     
@@ -39,6 +39,7 @@ if __name__ == '__main__':
     input_w = X_train_reduced.shape[2]
     N_classes = Y_train_reduced.shape[1]
     
+    #%%
     n_examples_per_class= np.sum(Y_train_reduced, axis = 0, keepdims = True)
     print('=========================================================')
     print('DATA SET STATISTICS')
@@ -58,12 +59,12 @@ if __name__ == '__main__':
 
     
     #%% parameters
-    N_hidden_layers = 1
+    N_hidden_layers = 3
     N_dense = int(100)
-    lr = 1e-3
+    lr = 1e-4
     minibatch_size = 32
-    N_filters = 32
-    drop_prob = 0
+    N_filters = 64
+    drop_prob = 0.5
     seed = 1
     
     
@@ -133,7 +134,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 50
+    N_epochs = 110
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
@@ -142,9 +143,13 @@ if __name__ == '__main__':
 #        test_loss, test_acc = model.evaluate(X_dev, Y_dev)
 #        print('Test accuracy:', test_acc)
         
-        predictions = model.predict(X_train_reduced)
+        # Can't do the full train set for some reason...      
+        N_sample = 10000
+        X_train_sample = X_train_reduced[0:N_sample]
+        Y_train_sample = Y_train_reduced[0:N_sample]
+        predictions = model.predict(X_train_sample)
         predictions_thresholded = predictions > 0.5
-        f1_scores = metrics.f1_score(Y_train_reduced, predictions_thresholded, average=None)
+        f1_scores = metrics.f1_score(Y_train_sample, predictions_thresholded, average=None)
         print('Average train F1 score: ' + str(np.mean(f1_scores)))
         
         predictions = model.predict(X_dev)
@@ -226,7 +231,7 @@ if __name__ == '__main__':
 #    print(dev_confusion_matrix)
     
     #%%
-   model.save('audioset_multilabel_M9.h5')
+#   model.save('audioset_multilabel_M19.h5')
 
 
 

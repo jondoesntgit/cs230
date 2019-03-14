@@ -38,7 +38,7 @@ ID_array = balanced_train_h5['slugs'][()]
 # first normalize all the data
 X_train = X_train/255
 
-
+#%%
 # subselect N favourite classes
 # male speech: 1
 # female speech: 2
@@ -58,9 +58,24 @@ N_classes = len(classes_to_keep)
 Y_train_reduced = Y_train[:,classes_to_keep]
 n_classes_per_example = np.sum(Y_train_reduced,axis=1,keepdims=True)
 positive_class_examples = np.nonzero(n_classes_per_example >= 1)[0]
-Y_train_reduced = Y_train_reduced[positive_class_examples,:]
-X_train_reduced = X_train[positive_class_examples,:,:,:]
+Y_train_reduced2 = Y_train_reduced[positive_class_examples,:]
+X_train_reduced2 = X_train[positive_class_examples,:,:,:]
 
+
+# add in some data with no classes
+negative_class_examples = np.nonzero(n_classes_per_example == 0)[0]
+N_negative_to_keep = 20000
+Y_train_reduced3 = Y_train_reduced[negative_class_examples[0:N_negative_to_keep],:]
+X_train_reduced3 = X_train[negative_class_examples[0:N_negative_to_keep],:,:,:]
+
+X_train_reduced = np.concatenate((X_train_reduced2, X_train_reduced3))
+Y_train_reduced = np.concatenate((Y_train_reduced2, Y_train_reduced3))
+
+# and reshuffle
+shuffle_inds = list(range(0,X_train_reduced.shape[0]))
+shuffle(shuffle_inds)
+X_train_reduced = X_train_reduced[shuffle_inds]
+Y_train_reduced = Y_train_reduced[shuffle_inds]
 
 
 ## iterate through and remove most of the music examples
@@ -101,7 +116,7 @@ X_train_reduced = X_train[positive_class_examples,:,:,:]
 #Y_train_reduced = Y_train_reduced[shuffled_indices]
 
 
-
+#%%
 # now split off last 5% of data to use as dev set
 num_examples = Y_train_reduced.shape[0]
 X_dev = X_train_reduced[ int(num_examples*0.95):,:,:,:]
@@ -133,7 +148,7 @@ Y_train_reduced = Y_train_reduced[ :int(num_examples*0.95)-1,:]
 #    X_norm = (X_train_micro - mean) / np.sqrt(var)
 
 
-
+#%%
 # dataset statistics:
 n_examples_per_class= np.sum(Y_train_reduced, axis = 0, keepdims = True)
 print("Total number of examples in train set:")
@@ -163,7 +178,7 @@ print(n_examples_per_class)
 
 
 #%% Save train and dev splits using pickle
-pickle_out = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_multi_label_v1.pickle'),"wb")
+pickle_out = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_multi_label_w_negs_v2.pickle'),"wb")
 data = (X_train_reduced, Y_train_reduced, X_dev, Y_dev);
 
 pkl.dump(data, pickle_out)

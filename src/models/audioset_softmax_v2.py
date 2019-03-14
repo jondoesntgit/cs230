@@ -133,7 +133,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 5
+    N_epochs = 3
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
