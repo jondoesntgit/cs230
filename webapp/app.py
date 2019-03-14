@@ -63,27 +63,23 @@ def get_vggish_features(y, sr):
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
-        #self.write("Hello, world2")
-        items = ['Item1', 'item2', 'item3']
-        self.render('static/template.html', title='My Title', items=items)
+        self.render('static/template.html', title='Deep Audio Classifier')
 
 class AudioUploadHandler(tornado.web.RequestHandler):
     def post(self):
         print('Handling post')
         #print('self', self)
         #print('request', self.request)
-        #print('body', self.request.body)
-        #print('request', self.request)
-        #print('files', self.request.files)
-        #print(type(self.request.files['audio'][0]))
+        print('body', self.request.body)
+        print('request', self.request)
+        print('files', self.request.files)
+        print(self.request.files.keys())
+        #print(type(self.request.files['audio'][0])))
         file = self.request.files['audio'][0]
         p = Path('uploads/tmp.wav')
         with p.open('wb') as f:
             f.write(file['body'])
-        self.write(json.dumps({'localFile': 'tmp.wav'}))
-
-        #r = json.dumps({'status': 'okay'})
-        #self.write(r)
+        self.write('tmp.wav')
 
 class EchoWebSocket(tornado.websocket.WebSocketHandler):
     def open(self):
@@ -102,8 +98,8 @@ class EchoWebSocket(tornado.websocket.WebSocketHandler):
         self.write_message(json.dumps({'vggish_path': vggish_path}))
 
         vggish_features = vggish_features[np.newaxis,:,:,np.newaxis]
-        #print(vggish_features.shape)
-                #%% load classifier model
+
+        #%% load classifier model
         classifier = tf.keras.models.load_model(CLASSIFIER_PATH)
         prediction = classifier.predict(vggish_features)[0]
         self.write_message(json.dumps({'labels': prediction.tolist()}))
