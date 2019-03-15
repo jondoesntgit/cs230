@@ -25,15 +25,17 @@ PCA_PARAMS = str(Path(PCA_PARAMS).expanduser())
 os.environ['KMP_DUPLICATE_LIB_OK']='True' # Hacky way to suppress a warning
 CLASSIFIER_PATH = 'audioset_multilabel_M18.h5'
 
-def get_mel_spectrogram(y, sr):
+def get_mel_spectrogram(y, sr, name):
     arr = librosa.feature.melspectrogram(y=y, sr=sr)
-    plt.imshow(arr)
+    plt.imshow(np.log(arr))
     plt.ylabel('Frequency')
     plt.xlabel('Time')
-    plt.savefig('processed/mel.png', dpi=300, bbox_inches='tight')
-    return 'processed/mel.png'
+    sub = Path(name).stem
+    fname = 'processed/%s_mel.png' % sub
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
+    return fname
 
-def get_vggish_features(y, sr):
+def get_vggish_features(y, sr, name):
     with tf.Graph().as_default(), tf.Session() as sess:
     # Prepare a postprocessor to munge the model embeddings.
         examples_batch = w2e(y, sr)
@@ -58,8 +60,9 @@ def get_vggish_features(y, sr):
         plt.imshow(postprocessed_batch)
         plt.xlabel('Feature')
         plt.ylabel('Time')
-        plt.savefig('processed/vggish.png', dpi=300, bbox_inches='tight')
-        return 'processed/vggish.png', postprocessed_batch
+        fname = 'processed/%s_vggish.png' % Path(name).stem
+        plt.savefig(fname, dpi=300, bbox_inches='tight')
+        return fname, postprocessed_batch
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
@@ -70,16 +73,16 @@ class AudioUploadHandler(tornado.web.RequestHandler):
         print('Handling post')
         #print('self', self)
         #print('request', self.request)
-        print('body', self.request.body)
-        print('request', self.request)
-        print('files', self.request.files)
-        print(self.request.files.keys())
+        #print('body', self.request.body)
+        #print('request', self.request)
+        #print('files', self.request.files)
+        #print(self.request.files.keys())
         #print(type(self.request.files['audio'][0])))
         file = self.request.files['audio'][0]
-        p = Path('uploads/tmp.wav')
+        p = Path('uploads/%s' % file['filename'])
         with p.open('wb') as f:
             f.write(file['body'])
-        self.write('tmp.wav')
+        self.write(file['filename'])
 
 class EchoWebSocket(tornado.websocket.WebSocketHandler):
     def open(self):
@@ -91,10 +94,10 @@ class EchoWebSocket(tornado.websocket.WebSocketHandler):
         #self.write_message(u'You said: ' + message)
 
         y, sr = librosa.load(str(p))
-        mel_path = get_mel_spectrogram(y, sr)
+        mel_path = get_mel_spectrogram(y, sr, message)
         self.write_message(json.dumps({'mel_path':  mel_path}))
 
-        vggish_path, vggish_features = get_vggish_features(y, sr)
+        vggish_path, vggish_features = get_vggish_features(y, sr, message)
         self.write_message(json.dumps({'vggish_path': vggish_path}))
 
         vggish_features = vggish_features[np.newaxis,:,:,np.newaxis]

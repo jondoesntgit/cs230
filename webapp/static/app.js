@@ -8,12 +8,20 @@ chooser.onchange = function(e) {
   sound.onend = function(e) {
     URL.revokeObjectURL(this.src);
   }
+  $('#mel').hide()
+  $('#vggish').hide()
+  $('#predictions').hide()
 }
 
 form = document.getElementById('upload-form')
 form.onsubmit = function(e){
 	e.preventDefault();
-
+  $('#mel').hide()
+  $('#vggish').hide()
+  $('#predictions').hide()
+  $('#mel-spinner').show()
+  $('#vggish-spinner').show()
+  $('#predictions-spinner').show()
 	var url=$(this).closest('form').attr('action')
 	data=$(this).closest('form').serialize();
   var formData = new FormData();
@@ -49,6 +57,12 @@ audioInput.onchange = function(e){
 }
 */
 
+$('#mel').hide()
+$('#vggish').hide()
+$('#predictions').hide()
+$('#mel-spinner').hide()
+$('#vggish-spinner').hide()
+$('#predictions-spinner').hide()
 
 var ws = new WebSocket('ws://localhost:5000/websocket')
 ws.onopen = function() {
@@ -60,16 +74,22 @@ ws.onmessage = function (evt) {
   value = Object.values(json)[0];
   switch (key) {
     case 'mel_path':
-      console.log(value)
       $('#mel').attr('src', '/' + value);
+      $('#mel').show()
+      $('#mel-spinner').hide()
+
       break;
     case 'vggish_path':
       $('#vggish').attr('src', '/' + value);
+      $('#vggish').show()
+      $('#vggish-spinner').hide()
       break;
     case 'labels':
       value.forEach(function(val, i) {
         $('#t' + i).text(val)
       })
+      $('#predictions').show()
+      $('#predictions-spinner').hide()
       break;
   }
 }
