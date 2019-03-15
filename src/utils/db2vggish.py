@@ -98,7 +98,7 @@ def main(conn, num_videos_to_grab):
     sql = """
     UPDATE embeddings SET worker=%s, start_time=now() FROM
         (SELECT id, video_id, filter_id from embeddings
-        WHERE start_time IS NULL LIMIT %s) sub
+        WHERE filter_id <= 2 AND start_time IS NULL LIMIT %s) sub
     INNER JOIN videos on videos.id=sub.video_id
     INNER JOIN filters on filters.id=sub.filter_id
     WHERE embeddings.id=sub.id AND filters.id=sub.filter_id
