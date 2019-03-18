@@ -12,13 +12,14 @@ from tensorflow.keras import backend as K
 
 import numpy as np
 from dotenv import load_dotenv
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import h5py
 import os
 from sklearn import metrics
 from pathlib import Path
 from random import shuffle
 import pickle as pkl
+
 
 load_dotenv()
 
@@ -31,7 +32,7 @@ AUDIOSET_SPLITS_V1 = Path(AUDIOSET_SPLITS_V1).expanduser()
 if __name__ == '__main__':
 
     #%% load data numpy files
-    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_7_classes_v2.pickle'), 'rb')
+    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_plus_other_FINAL.pickle'), 'rb')
     data = pkl.load(pickle_in)
     (X_train_reduced, Y_train_reduced, X_dev, Y_dev) = data
     
@@ -59,10 +60,10 @@ if __name__ == '__main__':
     
     #%% parameters
     N_hidden_layers = 3
-    N_dense = int(1e3)
+    N_dense = 100
     lr = 1e-4
     minibatch_size = 32
-    N_filters = 256
+    N_filters = 64
     drop_prob = 0.5
     seed = 1
     
@@ -133,13 +134,32 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 3
+    N_epochs = 50
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
         model.fit(X_train_reduced, Y_train_reduced, epochs=1, batch_size=32)
         test_loss, test_acc = model.evaluate(X_dev, Y_dev)
         print('Test accuracy:', test_acc)
+        
+        # Can't do the full train set for some reason...      
+        N_sample = 10000
+        X_train_sample = X_train_reduced[0:N_sample]
+        Y_train_sample = Y_train_reduced[0:N_sample]
+        predictions = model.predict(X_train_sample)
+        predictions_thresholded = predictions > 0.5
+        f1_scores = metrics.f1_score(Y_train_sample, predictions_thresholded, average=None)
+        print('Average train F1 score: ' + str(np.mean(f1_scores)))
+        
+        predictions = model.predict(X_dev)
+        predictions_thresholded = predictions > 0.5
+        f1_scores = metrics.f1_score(Y_dev, predictions_thresholded, average=None)
+        print('Average dev F1 score: ' + str(np.mean(f1_scores)))
+        
+        
+        
+        
+        
         
         
     
@@ -184,12 +204,51 @@ if __name__ == '__main__':
     
     #%% create confusion matrix for dev set
     
+#    class_names = ['Male Speech', 'Female Speech', 'Bird', 'Water', 'Engine', 'Siren']
+#    
+#    def plot_confusion_matrix(cm, title='Confusion matrix', cmap=plt.cm.Blues):
+#        plt.imshow(cm, interpolation='nearest', cmap=cmap)
+#        plt.title(title)
+#        plt.colorbar()
+#        tick_marks = np.arange(len(class_names))
+#        plt.xticks(tick_marks, class_names, rotation=45)
+#        plt.yticks(tick_marks, class_names)
+#        plt.tight_layout()
+#        plt.ylabel('True label')
+#        plt.xlabel('Predicted label')
+#    
+#    
     dev_confusion_matrix = metrics.confusion_matrix(Y_dev.argmax(axis=1), predictions.argmax(axis=1))
     print('Dev set confusion matrix:')
     print(dev_confusion_matrix)
     
+#    plt.figure()
+#    plot_confusion_matrix(dev_confusion_matrix)
+    
+    
     #%%
-#   model.save('audioset_softmax_run46.h5')
+    
+#    
+#    # Compute confusion matrix
+#cm = metrics.confusion_matrix(Y_dev.argmax(axis=1), predictions.argmax(axis=1))
+#np.set_printoptions(precision=2)
+#print('Confusion matrix, without normalization')
+#print(cm)
+#plt.figure()
+#plot_confusion_matrix(cm)
+#
+## Normalize the confusion matrix by row (i.e by the number of samples
+## in each class)
+#cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+#print('Normalized confusion matrix')
+#print(cm_normalized)
+#plt.figure()
+#plot_confusion_matrix(cm_normalized, title='Normalized confusion matrix')
+#
+#plt.show()
+    
+    #%%
+   model.save('audioset_softmax_run50.h5')
 
 
 
