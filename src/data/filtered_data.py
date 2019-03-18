@@ -123,7 +123,7 @@ if __name__ == '__main__':
     slugs = np.array(list(aws_key_dict.keys())).astype('S11')
 
     h5file = h5py.File(str(output_file), mode='w')
-    h5file['X'] = X
+    h5file['X'] = np.swapaxes(X, 1, 2)
     h5file['y'] = y
     h5file['slugs'] = slugs
     h5file.close()
