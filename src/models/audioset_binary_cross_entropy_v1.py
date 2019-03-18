@@ -31,7 +31,7 @@ AUDIOSET_SPLITS_V1 = Path(AUDIOSET_SPLITS_V1).expanduser()
 if __name__ == '__main__':
 
     #%% load data numpy files
-    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_multi_label_w_negs_v2.pickle'), 'rb')
+    pickle_in = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_plus_other_sigmoid_FINAL.pickle'), 'rb')
     data = pkl.load(pickle_in)
     (X_train_reduced, Y_train_reduced, X_dev, Y_dev) = data
     
@@ -134,7 +134,7 @@ if __name__ == '__main__':
 #                  metrics=['accuracy'])
     
     #%%
-    N_epochs = 110
+    N_epochs = 50
 
     for i in range(N_epochs):
         print('Epoch: ' + str(i+1))
@@ -226,12 +226,12 @@ if __name__ == '__main__':
     
     #%% create confusion matrix for dev set
     
-#    dev_confusion_matrix = metrics.confusion_matrix(Y_dev.argmax(axis=1), predictions.argmax(axis=1))
-#    print('Dev set confusion matrix:')
-#    print(dev_confusion_matrix)
+    dev_confusion_matrix = metrics.confusion_matrix(Y_dev.argmax(axis=1), predictions.argmax(axis=1))
+    print('Dev set confusion matrix:')
+    print(dev_confusion_matrix)
     
     #%%
-#   model.save('audioset_multilabel_M19.h5')
+    model.save('audioset_multilabel_51.h5')
 
 
 

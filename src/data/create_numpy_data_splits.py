@@ -48,7 +48,8 @@ X_train = X_train/255
 # siren: 396
 # music: 137
 
-classes_to_keep = [ 137, 1, 2, 111, 288, 343, 396]
+#classes_to_keep = [ 137, 1, 2, 111, 288, 343, 396]  # this one includes music
+classes_to_keep = [ 1, 2, 111, 288, 343, 396]
 N_classes = len(classes_to_keep)
 #num_labels = len(Y_train[1])
 
@@ -63,24 +64,24 @@ X_train_reduced = X_train[single_class_examples[0],:,:,:]
 
 
 # iterate through and remove most of the music examples
-N_music_to_keep = 20000
-music_index = 0 # new index in the classes_to_keep array
-integer_classes = Y_train_reduced.argmax(axis=1)
-music_indices = np.nonzero(integer_classes == music_index)
-music_indices = music_indices[0]
-non_music_indices = np.nonzero(integer_classes != music_index)
-non_music_indices = non_music_indices[0]
-new_indices = np.concatenate((music_indices[0:N_music_to_keep], non_music_indices))
-shuffle(new_indices)
-X_train_reduced = X_train_reduced[ new_indices ,:,:,: ] 
-Y_train_reduced = Y_train_reduced[ new_indices ,: ]     
+#N_music_to_keep = 20000
+#music_index = 0 # new index in the classes_to_keep array
+#integer_classes = Y_train_reduced.argmax(axis=1)
+#music_indices = np.nonzero(integer_classes == music_index)
+#music_indices = music_indices[0]
+#non_music_indices = np.nonzero(integer_classes != music_index)
+#non_music_indices = non_music_indices[0]
+#new_indices = np.concatenate((music_indices[0:N_music_to_keep], non_music_indices))
+#shuffle(new_indices)
+#X_train_reduced = X_train_reduced[ new_indices ,:,:,: ] 
+#Y_train_reduced = Y_train_reduced[ new_indices ,: ]     
 
 
-# create an "other" class set and add it in
+## create an "other" class set and add it in
 
 # these are the examples which don't contain any of our target labels
 non_target_examples = np.nonzero(n_classes_per_example == 0)[0]
-N_other_examples_to_keep = 50000
+N_other_examples_to_keep = 23000
 
 X_train_other = X_train[non_target_examples[0:N_other_examples_to_keep],:,:,:]
 other_class_index = Y_train_reduced.shape[1]
@@ -101,7 +102,11 @@ X_train_reduced = X_train_reduced[shuffled_indices]
 Y_train_reduced = Y_train_reduced[shuffled_indices]
 
 
+#%%
+# ONLY DO THIS IF YOU WANT SIGMOID ACTIVATIONS instead of explicit Other category.
+Y_train_reduced = Y_train_reduced[:,:6]
 
+#%%
 # now split off last 5% of data to use as dev set
 num_examples = Y_train_reduced.shape[0]
 X_dev = X_train_reduced[ int(num_examples*0.95):,:,:,:]
@@ -163,7 +168,7 @@ print(n_examples_per_class)
 
 
 #%% Save train and dev splits using pickle
-pickle_out = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_7_classes_v2.pickle'),"wb")
+pickle_out = open(str(AUDIOSET_SPLITS_V1 / 'train_and_dev_6_classes_plus_other_sigmoid_FINAL.pickle'),"wb")
 data = (X_train_reduced, Y_train_reduced, X_dev, Y_dev);
 
 pkl.dump(data, pickle_out)
