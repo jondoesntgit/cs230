@@ -88,8 +88,6 @@ def fetch_by_slugs(slugs):
     if int(rows[0][0]) > 0:
         print('Waiting on', rows[0][0], 'results')
         return
-    else:
-        print('I can work')
     
     query = '''
     SELECT video_id, aws_key from embeddings WHERE filter_id=1 and video_id IN %s;
@@ -132,26 +130,13 @@ def main(filename, tfrecords_dir):
     
     slugs = h5file['slugs'][:]
     slugs = [s.decode() for s in slugs]
-    #add_slugs_to_work_list(slugs)
-    h5file['X_unfiltered'] = fetch_by_slugs(slugs)
-    exit()
-
-    #s = slugs[0].decode()
-    vggish = [
-        get_arr_from_slug(s.decode(), tfrecords_dir)
-        for s in tqdm.tqdm(slugs)
-    ]
-
-    print(vggish)
-
-
-    return
-
-    tfrecord = 1
-
-    l = tf.python_io.tf_record_iterator()
-    print(slugs)
-
+    add_slugs_to_work_list(slugs)
+    data = fetch_by_slugs(slugs)
+    try:
+        h5file['X_unfiltered'] = data
+    except RuntimeError:
+        del h5file['X_unfiltered']
+        h5file['X_unfiltered'] = data
 
 
 if __name__ == '__main__':
