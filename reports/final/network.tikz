@@ -1,0 +1,43 @@
+
+[>=latex]
+
+\def\maxx{3}
+\def\maxy{8}
+\def\xscale{2}
+\def\numout{6}
+
+\draw [fill=blue!20] (1.5, 1) rectangle (\maxy-.5, 0);
+
+\foreach \x in {1, 2, ..., \maxx}{
+    \foreach \y in {1, 2, ..., \maxy}{
+        \node[draw, circle] (c\x\y) at (\y,-\xscale*\x) {};
+    }
+}
+
+\pgfmathparse{\maxx-1}
+
+\foreach \x in {1, 2, ..., \pgfmathresult}{
+    \foreach \y in {1, 2, ..., \maxy}{
+        \foreach \ytwo in {1, 2, ..., \maxy}{
+        \pgfmathtruncatemacro{\nextx}{\x+1}
+        \draw[->] (c\x\y) -- (c\nextx\ytwo);
+        }
+    }
+}
+
+\foreach \yout in {1, 2, ..., \numout} {
+    \node[draw, circle, fill=blue!80] (o\yout) at (2*\yout/2 + \maxy/2 - \numout/2,-\maxx*\xscale-\xscale) {};
+}
+
+\pgfmathparse{\maxy-1}
+
+\foreach \x in {1, 2, ..., \maxy}{
+\foreach \vggx in {2, 3, ..., \pgfmathresult}{
+    \draw[->] (\vggx, 0) -- (c1\x);
+}}
+
+\foreach \x in {1, 2, ..., \maxy}{
+\foreach \xo in {1, 2, ..., \numout} {
+\draw[->] (c3\x) -- (o\xo);
+}
+}

@@ -8,3 +8,5 @@ youtube_dl
 resampy
 soundfile
 requests
+tornado
+matplotlib
