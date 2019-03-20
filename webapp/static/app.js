@@ -1,6 +1,8 @@
 
+console.log('Now running on Heroku')
 chooser = document.getElementById('audioInput')
 chooser.onchange = function(e) {
+    console.log('Allowing user to listen to new audio input')
   var sound = document.getElementById('sound');
   sound.src = URL.createObjectURL(this.files[0]);
   // not really needed in this exact case, but since it is really important in other cases,
@@ -64,7 +66,10 @@ $('#mel-spinner').hide()
 $('#vggish-spinner').hide()
 $('#predictions-spinner').hide()
 
-var ws = new WebSocket('ws://localhost:5000/websocket')
+socketURL = window.location.href
+socketURL = 'ws://' + socketURL.split('//')[1] + 'websocket'
+console.log(socketURL)
+var ws = new WebSocket(socketURL)
 ws.onopen = function() {
   //ws.send('tmp.wav');
 };

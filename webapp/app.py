@@ -16,6 +16,10 @@ import sys
 sys.path.append('../src/')
 from features.vggish_input import waveform_to_examples as w2e
 from features import vggish_slim, vggish_postprocess, vggish_params
+from optparse import OptionParser
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 load_dotenv()
 CHECKPOINT = os.getenv('VGGISH_MODEL_CHECKPOINT')
@@ -23,7 +27,7 @@ CHECKPOINT = str(Path(CHECKPOINT).expanduser())
 PCA_PARAMS = os.getenv('EMBEDDING_PCA_PARAMETERS')
 PCA_PARAMS = str(Path(PCA_PARAMS).expanduser())
 os.environ['KMP_DUPLICATE_LIB_OK']='True' # Hacky way to suppress a warning
-CLASSIFIER_PATH = 'audioset_multilabel_M18.h5'
+CLASSIFIER_PATH = 'audioset_multilabel_M23.h5'
 
 def get_mel_spectrogram(y, sr, name):
     arr = librosa.feature.melspectrogram(y=y, sr=sr)
@@ -86,18 +90,20 @@ class AudioUploadHandler(tornado.web.RequestHandler):
 
 class EchoWebSocket(tornado.websocket.WebSocketHandler):
     def open(self):
-        print('WebSocket opened')
+        logging.debug('WebSocket opened')
 
     def on_message(self, message):
-        print(f'Processing {message}')
+        logging.debug(f'Processing {message}')
         p = Path('uploads') / message
         #self.write_message(u'You said: ' + message)
 
         y, sr = librosa.load(str(p))
         mel_path = get_mel_spectrogram(y, sr, message)
+        logging.debug('Writing mel_path')
         self.write_message(json.dumps({'mel_path':  mel_path}))
 
         vggish_path, vggish_features = get_vggish_features(y, sr, message)
+        logging.debug('Writing vggish_path')
         self.write_message(json.dumps({'vggish_path': vggish_path}))
 
         vggish_features = vggish_features[np.newaxis,:,:,np.newaxis]
@@ -105,7 +111,9 @@ class EchoWebSocket(tornado.websocket.WebSocketHandler):
         #%% load classifier model
         classifier = tf.keras.models.load_model(CLASSIFIER_PATH)
         prediction = classifier.predict(vggish_features)[0]
+        logging.debug('Writing labels')
         self.write_message(json.dumps({'labels': prediction.tolist()}))
+        logging.debug(f'Finished processing {message}')
 
     def on_close(self):
         print('Webscoetk closed')
@@ -120,8 +128,17 @@ def make_app():
     ], gzpi=True)
 
 if __name__ == "__main__":
+
+    parser = OptionParser()
+    parser.add_option('-p', '--port', dest='port', default=80, type=int)
+    parser.add_option('--host', dest='hostname', default='localhost')
+    options, args = parser.parse_args()
+
+    port = options.port
+    hostname = options.hostname
+
     app = make_app()
-    app.listen(5000)
+    app.listen(port)
     tornado.autoreload.start()
     for dir, _, files in os.walk('static'):
         [tornado.autoreload.watch(dir + '/' + f) for f in files if not f.startswith('.')]
