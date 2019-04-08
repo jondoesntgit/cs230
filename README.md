@@ -1,6 +1,20 @@
 # cs230
 
-# Installation
+# 
+
+This is school project for CS230 at Stanford University (Deep Learning). This project has to do with classifying audio clips according to their Mel Spectrograms. Input audio is downloaded, and optionally trimmed to 10 seconds, and saved as a .wav file. The audio is resampled to 44100 Hz, and then converted into a spectrogram. The spectrogram is then fed into a pre-trained model produced by Google called VGGIsh. The output of the VGGish neural net is then passed through a convolutional layer, and a few fully-connected layers. The final layer is a few softmax nodes each corresponding to an audio category (e.g. "Male Speech", "Siren"). 
+
+There's a fair amount of modularized code inside of this repository. There is a Tornado webapp for showing a live demo, where audio can be uploaded and classified.
+
+There are some remnants from some earlier work that we did to duplicate the results of Piczak with a classifier on the ESC50 dataset.
+
+There are some files stored under /src/utils for scraping data from youtube, and storing it into a PostgreSQL, S3 database to be accessed later.
+
+If you are interested in using or re-using any of this code, it's probably better for you to email jamwheel@stanford.edu, and have me walk through how to use this code, as it would take some time to fully document all of this code.
+
+# Installation 
+
+(At least, how to install some of the stuff when we first started)
 
 Somewhere on your local machine (perhaps even inside of Dropbox), run the following in a terminal.
 
